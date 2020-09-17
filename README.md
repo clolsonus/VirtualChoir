@@ -30,6 +30,8 @@ require.
   all the claps (done!)
 3. Mix the audio tracks together (done!)
 
+![chroma sync](images/chroma.png?raw=true "Chroma Representation")
+
 ## Here are fancier things I plan (hope) to add:
 
 1. Beat syncing.  Find small adjustments throughout the piece to
