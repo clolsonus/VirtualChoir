@@ -105,6 +105,17 @@ for beats in beat_list:
         beats[i] -= offset
     print(beats)
     
+# try to find nearly matching beats between clips
+for i in range(len(beat_list)-1):
+    beats1 = beat_list[i]
+    for j in range(i+1, len(beat_list)):
+        print(i, j)
+        beats2 = beat_list[j]
+        for b1 in beats1:
+            for b2 in beats2:
+                if abs(b1 - b2) < 0.15:
+                    print("  track %d vs %d: %.3f %.3f" % (i, j, b1, b2))
+        
 # plot basic clip waveforms
 fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
 for i in range(len(raws)):
