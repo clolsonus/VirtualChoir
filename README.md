@@ -41,3 +41,17 @@ require.
    video more interesting.
 
 
+# Installation
+
+These scripts depend on some libraries that are not normally found in
+a standard python distribution.  These extra libraries can easily be
+installed with "pip".  For those with opinions about how to manage
+they python dependencies, maybe your linux distribution already has
+some of these libraries packaged, or maybe your python system
+(i.e. conda) has some of these available already.  It may be worth
+checking both of those first and then using pip if no pre-packaged
+libraries are found.
+
+When I do this sort of thing, I run the script, see what package
+import fails, install it, repeat ..., eventually I have all the
+dependencies and the script works, yeah!
