@@ -132,26 +132,9 @@ if True:
         ax[i].plot(time_list[i], onset_list[i])
         for b in beat_list[i]:
             ax[i].axvline(x=b, color='b')
-        
-    if False:
-        # plot raw spectrogram (this doesn't seem as useful as the chroma plot)
-        fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
-        for i, raw in enumerate(raws):
-            M=1024
-            dt = 1 / samples[i].frame_rate
-            sync_ms = clap_offset[i]
-            rate = samples[i].frame_rate
-            trimval = int(round(sync_ms * rate / 1000))
-            freqs, t, Sx = signal.spectrogram(np.array(raw[trimval:]), fs=dt,
-                                                  window='hanning',
-                                                  nperseg=M, noverlap=M - 100,
-                                                  detrend=False, scaling='spectrum')
-            ax[i].pcolormesh(t, freqs, 10 * np.log10(Sx), cmap='viridis')
-            ax[i].set_title("Accelerometer Spectogram")
-            ax[i].set_ylabel('Frequency [Hz]')
-            ax[i].set_xlabel('Time [s]');
 
-    hop_length = 1024
+    # compute and plot chroma representation of clips
+    hop_length = 512
     chromas = []
     fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
     for i in range(len(raws)):
@@ -165,44 +148,6 @@ if True:
                                        hop_length=hop_length, ax=ax[i])
         ax[i].set(title='Chroma Representation of ' + args.videos[i])
     fig.colorbar(img, ax=ax)
-
-    if False:
-        # this could possibly be used to find a series of sync offsets
-        # between audio streams, but you need the same notes ...
-        D, wp = librosa.sequence.dtw(X=chromas[0], Y=chromas[2], metric='cosine')
-        wp_s = librosa.frames_to_time(wp, sr=samples[i].frame_rate, hop_length=hop_length)
-
-        fig, ax = plt.subplots()
-        img = librosa.display.specshow(D, x_axis='time', y_axis='time', sr=samples[i].frame_rate,
-                                       cmap='gray_r', hop_length=hop_length, ax=ax)
-        ax.plot(wp_s[:, 1], wp_s[:, 0], marker='o', color='r')
-        ax.set(title='Warping Path on Acc. Cost Matrix $D$',
-               xlabel='Time $(X_2)$', ylabel='Time $(X_1)$')
-        fig.colorbar(img, ax=ax)
-
-        from matplotlib.patches import ConnectionPatch
-
-        fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True, sharey=True, figsize=(8, 4))
-
-        # Plot x_2
-        librosa.display.waveplot(np.array(raws[2][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax2)
-        ax2.set(title='track 2')
-
-        # Plot x_1
-        librosa.display.waveplot(np.array(raws[0][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax1)
-        ax1.set(title='track 0')
-        ax1.label_outer()
-
-        n_arrows = 20
-        for tp1, tp2 in wp_s[::len(wp_s)//n_arrows]:
-            # Create a connection patch between the aligned time points
-            # in each subplot
-            con = ConnectionPatch(xyA=(tp1, 0), xyB=(tp2, 0),
-                                  axesA=ax1, axesB=ax2,
-                                  coordsA='data', coordsB='data',
-                                  color='r', linestyle='--',
-                                  alpha=0.5)
-            ax2.add_artist(con)
 
     plt.show()
 
