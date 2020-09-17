@@ -13,23 +13,21 @@ require.
 ## Basic concept
 
 * Step 1: create a reference track with a sync clap at the start.
-  Ex. 1, 2, 3, 4, CLAP, 2, 3, 4, <play>, 2, 3, 4 ...
+  Ex. 1, 2, 3, 4, CLAP, 2, 3, 4, PLAY, 2, 3, 4 ...
 * Send this track to all participants with their part(s)
 * Participants listen to the reference track through headphones, clap
   at the exact same time as the reference clap, and then play along
   their part.  Participants record themselves playing with a phone or
   any movie camera.
-* These scripts will automatically find the sync claps, sync all the
-  audio streams, and mix them into a single virtual choir (or
-  orchestra.)
+* These scripts will load all the individual movie clips,
+  automatically find the sync claps, sync all the audio streams, and
+  mix them into a single virtual choir (or orchestra.)
 
 ## Here is what I have so far:
 
 1. Scan for an initial 'sync' clap. (done!)
-
 2. Trim the start of each clip the correct amount to perfectly align
-all the claps (done!)
-
+  all the claps (done!)
 3. Mix the audio tracks together (done!)
 
 ## Here are fancier things I plan (hope) to add:
