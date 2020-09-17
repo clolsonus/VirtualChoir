@@ -43,14 +43,17 @@ require.
 
 # Installation
 
-These scripts depend on some libraries that are not normally found in
+For now, these scripts require a python distribution to already be
+found on your system.  If you don't have python already, you may find
+'anaconda' a nice option.  Make sure you install python3 (not 2.)
+
+These scripts depend on a few libraries that are not normally found in
 a standard python distribution.  These extra libraries can easily be
 installed with "pip".  For those with opinions about how to manage
-they python dependencies, maybe your linux distribution already has
-some of these libraries packaged, or maybe your python system
-(i.e. conda) has some of these available already.  It may be worth
-checking both of those first and then using pip if no pre-packaged
-libraries are found.
+python dependencies, maybe your linux distribution already has some of
+these libraries packaged, or maybe your python system (i.e. conda) has
+some of these available already.  It may be worth checking both of
+those first and then using pip if no pre-packaged libraries are found.
 
 When I do this sort of thing, I run the script, see what package
 import fails, install it, repeat ..., eventually I have all the
