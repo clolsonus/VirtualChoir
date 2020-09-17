@@ -2,41 +2,27 @@
 
 # https://librosa.org/doc/latest/auto_examples/plot_music_sync.html#sphx-glr-auto-examples-plot-music-sync-py
 
+# pyrubberband may offer a higher quality stretch/compress function
+
 import argparse
 import librosa                  # pip install librosa
 import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import pycorrelate as pyc                # pip install pycorrelate
 from pydub import AudioSegment, playback  # pip install pydub
-from scipy import signal
-import sys
+from scipy import signal                  # spectrogram
 
 parser = argparse.ArgumentParser(description='virtual choir')
 parser.add_argument('videos', metavar='videos', nargs='+',
                     help='input videos')
 args = parser.parse_args()
 
-for v in args.videos:
-    basename, ext = os.path.splitext(v)
-    wavefile = basename + ".wav"
-    if not os.path.exists(wavefile):
-        print(v, basename, ext)
-        command = "ffmpeg -i %s -map 0:1 -acodec pcm_s16le -ac 2 %s" % (v, wavefile)
-        os.system(command)
-
 # return postion of sync clap in ms
 def find_sync_clap(raw, rate):
     for i, s in enumerate(raw):
         if abs(s) > 10000:
             return (i * 1000) / rate
-
-def correlate(raw1, raw2):
-    ycorr = pyc.ucorrelate(np.array(raw1), np.array(raw2), 11000)
-    #ycorr = np.correlate(raw1, raw2)
-    print(ycorr)
-    return ycorr
 
 # load samples, convert to mono, and normalize
 print("loading samples...")
@@ -72,7 +58,7 @@ for i, raw in enumerate(raws):
 for i in range(len(clap_offset)):
     clap_offset[i] -= min_sync
 
-# plot synced signals
+# simple plot synced signals
 print("plot synced signals...")
 fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
 for i, raw in enumerate(raws):
@@ -102,8 +88,41 @@ if True:
         #print(tempogram.shape, tempogram)
         times = librosa.times_like(oenv, sr=samples[i].frame_rate,
                                    hop_length=hop_length)
-        print(np.mean(oenv), np.std(oenv))
         ax[i].plot(times, oenv)
+        
+        # ok, try a thing
+        beat = 0
+        in_beat = False
+        mean = np.mean(oenv)
+        std = np.std(oenv)
+        maximum = np.max(oenv) * 10
+        print(mean, std, maximum)
+        beat_max = 0
+        beat_time = 0
+        last_beat = None
+        intervals = []
+        for i in range(len(times)):
+            if oenv[i] > 5*std:
+                in_beat = True
+            else:
+                if in_beat:
+                    # just finished a beat
+                    print("Beat: %.3f (%.1f)" % (beat_time, beat_max))
+                    if last_beat:
+                        interval = beat_time - last_beat
+                        last_beat = beat_time
+                        intervals.append(interval)
+                    else:
+                        last_beat = beat_time
+                in_beat = False
+                beat_max = 0
+            if in_beat:
+                if oenv[i] > beat_max:
+                    beat_max = oenv[i]
+                    beat_time = times[i]
+        print(intervals)
+        print("median beat:", np.median(intervals))
+
 
     if False:
         # plot raw spectrogram (this doesn't seem as useful as the chroma plot)
@@ -200,23 +219,3 @@ for i, v in enumerate(args.videos):
 if True:
     print("playing quick sync combined audio...")
     playback.play(mixed)
-
-ref = None
-plt.figure(1)
-for i, sample in enumerate(samples):
-    print(args.videos[i])
-    sync_ms = clap_offset[i]
-    sample = sample[sync_ms:]
-    raw = raws[i]
-    rate = samples[i].frame_rate
-    if ref is None:
-        ref = raw
-        cor = 0
-    else:
-        cor = correlate(ref, raw)
-    print(cor)
-    plt.title(basename)
-    plt.plot(cor)
-plt.show()
-
-    
