@@ -1,1 +1,45 @@
-Experiments with virtual choirs.
+# Experiments with Virtual Choirs
+
+In the age of covid-19 when performance groups struggle to meet and
+practice in person, and often are unable to perform to a full
+audience, virtual choirs (or orchestras) are a fun thing to create.
+However, the manual editing effort and technical skills required to
+create the final videos can be daunting.  The goal of this project is
+to develop some automated scripts so that smaller groups or
+individuals can create their own virtual choir videos without needing
+the immense technical skill and editing that these projects normally
+require.
+
+## Basic concept
+
+* Step 1: create a reference track with a sync clap at the start.
+  Ex. 1, 2, 3, 4, CLAP, 2, 3, 4, <play>, 2, 3, 4 ...
+* Send this track to all participants with their part(s)
+* Participants listen to the reference track through headphones, clap
+  at the exact same time as the reference clap, and then play along
+  their part.  Participants record themselves playing with a phone or
+  any movie camera.
+* These scripts will automatically find the sync claps, sync all the
+  audio streams, and mix them into a single virtual choir (or
+  orchestra.)
+
+## Here is what I have so far:
+
+1. Scan for an initial 'sync' clap. (done!)
+
+2. Trim the start of each clip the correct amount to perfectly align
+all the claps (done!)
+
+3. Mix the audio tracks together (done!)
+
+## Here are fancier things I plan (hope) to add:
+
+1. Beat syncing.  Find small adjustments throughout the piece to
+   improve the sync.
+2. Generate a choir video with an array of the input videos (with the
+   fully mixed sound track.)
+3. For larger choirs, enable a grouping function along with video
+   mixing options to be able to zoom on groups or individuals to make the
+   video more interesting.
+
+
