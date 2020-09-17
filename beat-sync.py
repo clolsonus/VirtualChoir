@@ -22,12 +22,6 @@ parser.add_argument('videos', metavar='videos', nargs='+',
                     help='input videos')
 args = parser.parse_args()
 
-# return postion of sync clap in ms
-def find_sync_clap(raw, rate):
-    for i, s in enumerate(raw):
-        if abs(s) > 10000:
-            return (i * 1000) / rate
-
 # load samples, convert to mono, and normalize
 print("loading samples...")
 samples = []
@@ -42,48 +36,20 @@ for v in args.videos:
     raw = mono.get_array_of_samples()
     raws.append(raw)
 
-# find first clap event in each sample
-print("locating sync clap...")
-clap_offset = []
-min_sync = None
-for i, raw in enumerate(raws):
-    v = args.videos[i]
-    raw = raws[i]
-    rate = samples[i].frame_rate
-    sync_ms = int(round(find_sync_clap(raw, rate)))
-    print(" ", args.videos[i], sync_ms)
-    clap_offset.append(sync_ms)
-    if min_sync == None:
-        min_sync = sync_ms
-    elif sync_ms < min_sync:
-        min_sync = sync_ms
-
-# minimal trimming
-for i in range(len(clap_offset)):
-    clap_offset[i] -= min_sync
-
-fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
-for i in range(len(raws)):
-    trimval = int(round(clap_offset[i] * rate / 1000))
-    librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
-    ax[i].set(title=args.videos[i])
-    ax[i].label_outer()
-
 # use librosa to analyze audio streams
 onset_list = []
 time_list = []
 beat_list = []
 hop_length = 512
 for i, raw in enumerate(raws):
-    sync_ms = clap_offset[i]
-    rate = samples[i].frame_rate
-    trimval = int(round(sync_ms * rate / 1000))
-    oenv = librosa.onset.onset_strength(y=np.array(raw[trimval:]).astype('float'),
-                                        sr=samples[i].frame_rate,
-                                        hop_length=hop_length)
-    t = librosa.times_like(oenv, sr=samples[i].frame_rate,
-                           hop_length=hop_length)
-    print("shapes:", oenv.shape, t.shape)
+    sr = samples[i].frame_rate
+    #sync_ms = clap_offset[i]
+    #trimval = int(round(sync_ms * rate / 1000))
+    
+    # compute onset envelopes
+    oenv = librosa.onset.onset_strength(y=np.array(raw).astype('float'),
+                                        sr=sr, hop_length=hop_length)
+    t = librosa.times_like(oenv, sr=sr, hop_length=hop_length)
     onset_list.append(oenv)
     time_list.append(t)
     
@@ -97,7 +63,10 @@ for i, raw in enumerate(raws):
     beat_time = 0
     last_beat = None
     beats = []
-    for i in range(len(t)):
+    for i in range(0, len(t)):
+        # skip/ignore beats in the first 1/2 second
+        if t[i] < 0.5:
+            continue
         if oenv[i] > 4*std:
             in_beat = True
         else:
@@ -124,24 +93,47 @@ for i, raw in enumerate(raws):
     print(intervals)
     print("median beat:", np.median(intervals))
 
+# assume first detected beat is the clap sync
+clap_offset = []
+for i in range(len(beat_list)):
+    clap_offset.append( beat_list[i][0] * 1000) # ms units
+
+# shift all beat times for each clip so that the sync clap is at t=0.0
+for beats in beat_list:
+    offset = beats[0]
+    for i in range(len(beats)):
+        beats[i] -= offset
+    print(beats)
+    
+# plot basic clip waveforms
+fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
+for i in range(len(raws)):
+    sr = samples[i].frame_rate
+    trimval = int(round(clap_offset[i] * sr / 1000))
+    librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
+    ax[i].set(title=args.videos[i])
+    ax[i].label_outer()
+    for b in beat_list[i]:
+        ax[i].axvline(x=b, color='b')
+
 # work with librosa to visualize audio streams
 if True:
-    # plot beat peaks
-    fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
+    # plot original (unaligned) onset envelope peaks
+    fig, ax = plt.subplots(nrows=len(onset_list), sharex=True, sharey=True)
     for i in range(len(onset_list)):
         ax[i].plot(time_list[i], onset_list[i])
-        for b in beat_list[i]:
-            ax[i].axvline(x=b, color='b')
 
-    # compute and plot chroma representation of clips
+    # compute and plot chroma representation of clips (I notice the
+    # timescale has an odd scaling, but doesn't seem to be a factor of
+    # 2, or maybe it is, so ???)
     hop_length = 512
     chromas = []
     fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
     for i in range(len(raws)):
-        trimval = int(round(clap_offset[i] * rate / 1000))
+        sr = samples[i].frame_rate
+        trimval = int(round(clap_offset[i] * sr / 1000))
         chroma = librosa.feature.chroma_cqt(y=np.array(raws[i][trimval:]).astype('float'),
-                                            sr=samples[i].frame_rate,
-                                            hop_length=hop_length)
+                                            sr=sr, hop_length=hop_length)
         chromas.append(chroma)
         img = librosa.display.specshow(chroma, x_axis='time',
                                        y_axis='chroma',
