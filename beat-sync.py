@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
 
-print("Note: this script is a work in progress and may not do anything useful yet!")
-print("Experimentation and learning in progress ...")
-print()
-
-# https://librosa.org/doc/latest/auto_examples/plot_music_sync.html#sphx-glr-auto-examples-plot-music-sync-py
-
-# pyrubberband may offer a higher quality stretch/compress function
-
 import argparse
 import librosa                  # pip install librosa
 import librosa.display
@@ -18,12 +10,15 @@ from pydub import AudioSegment, playback  # pip install pydub
 import pyrubberband as pyrb               # pip install pyrubberband
 from scipy import signal                  # spectrogram
 
+import cv2
+import skvideo.io               # pip install sk-video
+import video
+
 parser = argparse.ArgumentParser(description='virtual choir')
-parser.add_argument('videos', metavar='videos', nargs='+',
-                    help='input videos')
+parser.add_argument('videos', metavar='videos', nargs='+', help='input videos')
 args = parser.parse_args()
 
-# function from: https://stackoverflow.com/questions/51434897/how-to-change-audio-playback-speed-using-pydub
+# function copied from: https://stackoverflow.com/questions/51434897/how-to-change-audio-playback-speed-using-pydub
 def change_audioseg_tempo(segment, scale):
     y = np.array(segment.get_array_of_samples())
     if segment.channels == 2:
@@ -38,7 +33,7 @@ def change_audioseg_tempo(segment, scale):
     new_seg = AudioSegment(y.tobytes(), frame_rate=sr, sample_width=2, channels=channels)
     return new_seg
 
-# load samples, convert to mono, and normalize
+# load samples, normalize, then generate a mono version for analysis
 print("loading samples...")
 samples = []
 raws = []
@@ -120,6 +115,65 @@ for beats in beat_list:
     for i in range(len(beats)):
         beats[i] -= offset
     print(beats)
+
+#
+# work on generating video early for testing purposes
+#
+# fixme: deal with different input fps
+# fixme: deal with beat sync (maybe?)
+
+# open all video clips and advance to clap sync point
+videos = []
+for i, file in enumerate(args.videos):
+    v = video.VideoTrack()
+    v.open(file)
+    v.skip_secs(clap_offset[i] / 1000)
+    videos.append(v)
+
+# stats from first video
+fps = videos[0].fps
+w = videos[0].w
+h = videos[0].h
+# open writer for output
+inputdict = {
+    '-r': str(fps)
+}
+lossless = {
+    # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
+    '-vcodec': 'libx264',  # use the h.264 codec
+    '-crf': '0',           # set the constant rate factor to 0, (lossless)
+    '-preset': 'veryslow', # maximum compression
+    '-r': str(fps)         # match input fps
+}
+sane = {
+    # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
+    '-vcodec': 'libx264',  # use the h.264 codec
+    '-crf': '17',          # visually lossless (or nearly so)
+    '-preset': 'medium',   # default compression
+    '-r': str(fps)         # match input fps
+}
+writer = skvideo.io.FFmpegWriter("group.mp4", inputdict=inputdict, outputdict=sane)
+done = False
+while not done:
+    done = True
+    frames = []
+    for i, v in enumerate(videos):
+        frame = v.next_frame()
+        if not frame is None:
+            done = False
+            frame_scale = cv2.resize(frame, (0,0), fx=0.25, fy=0.25,
+                             interpolation=cv2.INTER_AREA)
+            frames.append(frame_scale)
+            # cv2.imshow(args.videos[i], frame_scale)
+    if not done:
+        main_frame = np.zeros(shape=[frames[0].shape[0], frames[0].shape[1]*4, frames[0].shape[2]], dtype=np.uint8)
+        for i, f in enumerate(frames):
+            if not f is None:
+                main_frame[0:f.shape[0],f.shape[1]*i:f.shape[1]*i+f.shape[1]] = f
+        cv2.imshow("main", main_frame)
+        cv2.waitKey(1)
+        writer.writeFrame(main_frame[:,:,::-1])  #write the frame as RGB not BGR
+writer.close()
     
 # find nearly matching beats between clips and group them
 import copy
@@ -241,6 +295,7 @@ for i, v in enumerate(args.videos):
         mixed = mixed.overlay(sample)
 print("playing quick sync combined audio...")
 playback.play(mixed)
+mixed.export("group.wav", format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 
 # do a quick mix from starting clap
 print("quick mix based on clap sync...")
@@ -257,3 +312,12 @@ for i, v in enumerate(args.videos):
 if True:
     print("playing quick sync combined audio...")
     playback.play(mixed)
+    
+from subprocess import call
+result = call(["ffmpeg", "-i", "group.mp4, "-i", "group.wav", "-c:v", "copy", "-c:a", "aac", "final.mp4"])
+print("ffmpeg result code:", result)
+if result == 0 and not args.keep_tmp_movie:
+    print("removing temp movie:", tmp_movie)
+    os.remove(tmp_movie)
+    print("output movie:", output_movie)
+
