@@ -16,9 +16,10 @@ require.
   Ex. 1, 2, 3, 4, CLAP, 2, 3, 4, PLAY, 2, 3, 4 ...
 * Send this track to all participants with their part(s)
 * Participants listen to the reference track through headphones, clap
-  at the exact same time as the reference clap, and then play along
-  their part.  Participants record themselves playing with a phone or
-  any movie camera.
+  at the exact same time as the reference clap, and then record
+  themselves playing their part in sync with the reference track.
+  Participants record themselves playing with a phone or any movie
+  camera.  (Even just recording the audio track could work.)
 * Participants could perform in small subgroups if they found a way to
   split/share headphones so they all simultaneously were listening to
   the same reference track.
