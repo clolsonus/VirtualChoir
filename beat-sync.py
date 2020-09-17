@@ -170,20 +170,25 @@ for i, sample in enumerate(samples):
     new = AudioSegment.empty()
     sr = sample.frame_rate
     offset = (clap_offset[i] / 1000) # secs
-    trimval = int(round(clap_offset[i] * sr / 1000))
     time_map = map_list[i]
     for j in range(len(time_map)-1):
         src_interval = time_map[j+1][0] - time_map[j][0]
         dst_interval = time_map[j+1][1] - time_map[j][1]
-        scale = dst_interval / src_interval
-        print("intervals:", src_interval, dst_interval, "scale:", scale)
+        speed = src_interval / dst_interval
+        print("intervals:", src_interval, dst_interval, "speed:", speed)
         c1 = int(round( (time_map[j][0] + offset) * 1000 ))
         c2 = int(round( (time_map[j+1][0] + offset) * 1000 ))
         clip = sample[c1:c2]
-        print(c1, c2, len(sample), len(clip))
         #new.extend( librosa.effects.time_stretch(np.array(clip).astype('float'), scale) )
-        new += change_audioseg_tempo(clip, scale)
-        print(len(new))
+        if abs(1.0 - speed) > 0.0001:
+            newclip = change_audioseg_tempo(clip, speed)
+        else:
+            print("straight copy")
+            newclip = clip
+        new += newclip
+        print(" ", c1, c2, len(sample), len(clip), len(newclip))
+    # c2 inherits last clip end, so add from there on to complete the clip
+    new += sample[c2:]
     #playback.play(new)
     temperals.append(new)
      
