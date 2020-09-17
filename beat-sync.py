@@ -70,8 +70,9 @@ for i in range(len(raws)):
     ax[i].label_outer()
 
 # use librosa to analyze audio streams
-onsets = []
-times = []
+onset_list = []
+time_list = []
+beat_list = []
 hop_length = 512
 for i, raw in enumerate(raws):
     sync_ms = clap_offset[i]
@@ -83,11 +84,10 @@ for i, raw in enumerate(raws):
     t = librosa.times_like(oenv, sr=samples[i].frame_rate,
                            hop_length=hop_length)
     print("shapes:", oenv.shape, t.shape)
-    onsets.append(oenv)
-    times.append(t)
+    onset_list.append(oenv)
+    time_list.append(t)
     
-    # ok, try a thing
-    beat = 0
+    # make a list (times) of the dominant beats
     in_beat = False
     mean = np.mean(oenv)
     std = np.std(oenv)
@@ -96,18 +96,18 @@ for i, raw in enumerate(raws):
     beat_max = 0
     beat_time = 0
     last_beat = None
-    intervals = []
+    beats = []
     for i in range(len(t)):
-        if oenv[i] > 5*std:
+        if oenv[i] > 4*std:
             in_beat = True
         else:
             if in_beat:
                 # just finished a beat
                 print("Beat: %.3f (%.1f)" % (beat_time, beat_max))
+                beats.append(beat_time)
                 if last_beat:
                     interval = beat_time - last_beat
                     last_beat = beat_time
-                    intervals.append(interval)
                 else:
                     last_beat = beat_time
             in_beat = False
@@ -116,6 +116,11 @@ for i, raw in enumerate(raws):
             if oenv[i] > beat_max:
                 beat_max = oenv[i]
                 beat_time = t[i]
+    beat_list.append(beats)
+    
+    intervals = []
+    for i in range(1, len(beats)):
+        intervals.append( beats[i] - beats[i-1] )
     print(intervals)
     print("median beat:", np.median(intervals))
 
@@ -123,8 +128,10 @@ for i, raw in enumerate(raws):
 if True:
     # plot beat peaks
     fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
-    for i in range(len(onsets)):
-        ax[i].plot(times[i], onsets[i])
+    for i in range(len(onset_list)):
+        ax[i].plot(time_list[i], onset_list[i])
+        for b in beat_list[i]:
+            ax[i].axvline(x=b, color='b')
         
     if False:
         # plot raw spectrogram (this doesn't seem as useful as the chroma plot)
