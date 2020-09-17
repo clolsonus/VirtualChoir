@@ -1,23 +1,13 @@
 #!/usr/bin/env python3
 
-# https://librosa.org/doc/latest/auto_examples/plot_music_sync.html#sphx-glr-auto-examples-plot-music-sync-py
-
-# pyrubberband may offer a higher quality stretch/compress function
-
 import argparse
-import librosa                  # pip install librosa
-import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import pycorrelate as pyc                # pip install pycorrelate
 from pydub import AudioSegment, playback  # pip install pydub
-from scipy import signal
-import sys
 
-parser = argparse.ArgumentParser(description='virtual choir')
-parser.add_argument('videos', metavar='videos', nargs='+',
-                    help='input videos')
+parser = argparse.ArgumentParser(description='simple virtual choir, synced on a starting clap')
+parser.add_argument('videos', metavar='videos', nargs='+', help='input videos')
 args = parser.parse_args()
 
 # return postion of sync clap in ms
