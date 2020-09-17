@@ -82,9 +82,9 @@ if True:
         oenv = librosa.onset.onset_strength(y=np.array(raw[trimval:]).astype('float'),
                                             sr=samples[i].frame_rate,
                                             hop_length=hop_length)
-        tempogram = librosa.feature.tempogram(onset_envelope=oenv,
-                                              sr=samples[i].frame_rate,
-                                              hop_length=hop_length)
+        #tempogram = librosa.feature.tempogram(onset_envelope=oenv,
+        #                                      sr=samples[i].frame_rate,
+        #                                      hop_length=hop_length)
         #print(tempogram.shape, tempogram)
         times = librosa.times_like(oenv, sr=samples[i].frame_rate,
                                    hop_length=hop_length)
