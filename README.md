@@ -19,9 +19,12 @@ require.
   at the exact same time as the reference clap, and then play along
   their part.  Participants record themselves playing with a phone or
   any movie camera.
-* These scripts will load all the individual movie clips,
-  automatically find the sync claps, sync all the audio streams, and
-  mix them into a single virtual choir (or orchestra.)
+* Participants could perform in small subgroups if they found a way to
+  split/share headphones so they all simultaneously were listening to
+  the same reference track.
+* The scripts developed for this project will load all the individual
+  movie clips, automatically find the sync claps, sync all the audio
+  streams, and mix them into a single virtual choir (or orchestra.)
 
 ## Here is what I have so far:
 
