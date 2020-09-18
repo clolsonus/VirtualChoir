@@ -81,17 +81,22 @@ def render_combined_video( video_names, offsets ):
     }
     writer = skvideo.io.FFmpegWriter("group.mp4", inputdict=inputdict, outputdict=sane)
     done = False
+    frames = [None] * len(videos)
     while not done:
         done = True
-        frames = []
         for i, v in enumerate(videos):
             frame = v.next_frame()
             if not frame is None:
                 done = False
                 frame_scale = cv2.resize(frame, (0,0), fx=0.25, fy=0.25,
                                  interpolation=cv2.INTER_AREA)
-                frames.append(frame_scale)
+                frames[i] = frame_scale
                 # cv2.imshow(video_names[i], frame_scale)
+            else:
+                # fade
+                frames[i] = (frames[i] * 0.9).astype('uint8')
+                if np.any(frames[i]):
+                    done = False
         if not done:
             main_frame = np.zeros(shape=[frames[0].shape[0], frames[0].shape[1]*4, frames[0].shape[2]], dtype=np.uint8)
             for i, f in enumerate(frames):
