@@ -10,6 +10,8 @@ individuals can create their own virtual choir videos without needing
 the immense technical skill and editing that these projects normally
 require.
 
+![demo choir](images/combined.png?raw=true "Combined Demo")
+
 ## Basic concept
 
 * Step 1: create a reference track with a sync clap at the start.
@@ -33,16 +35,22 @@ require.
 2. Trim the start of each clip the correct amount to perfectly align
   all the claps (done!)
 3. Mix the audio tracks together (done!)
+4. Beat syncing.  Find small adjustments throughout the piece to
+   improve the sync.  This doesn't change the overall tempo or
+   push/pull of the piece, but can hide when individual notes come in
+   early or late and tightens up the whole result (with some necessary
+   loss to audio quality.)
+5. Very rudimentary video tiling/mosaicing and combining with synced
+   audio to produce a proof of concept result.  Exciting!
 
 ![chroma sync](images/chroma.png?raw=true "Chroma Representation")
 
 ## Here are fancier things I plan (hope) to add:
 
-1. Beat syncing.  Find small adjustments throughout the piece to
-   improve the sync.
-2. Generate a choir video with an array of the input videos (with the
-   fully mixed sound track.)
-3. For larger choirs, enable a grouping function along with video
+1. A better and more general scheme for assembling the mosaic video
+   (figuring out sizes and arrangments, possibly with some sensible
+   user input to steer the final result choices.)
+2. For larger choirs, enable a grouping function along with video
    mixing options to be able to zoom on groups or individuals to make the
    video more interesting.
 
