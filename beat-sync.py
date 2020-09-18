@@ -14,6 +14,7 @@ import video
 
 parser = argparse.ArgumentParser(description='virtual choir')
 parser.add_argument('videos', metavar='videos', nargs='+', help='input videos')
+parser.add_argument('--beat-sync', action='store_true', help='do additional beat syncronization work to tighten up slight note timing misses')
 args = parser.parse_args()
 
 # function copied from: https://stackoverflow.com/questions/51434897/how-to-change-audio-playback-speed-using-pydub
@@ -116,78 +117,113 @@ for beats in beat_list:
 
 # render the new combined video
 video.render_combined_video( args.videos, clap_offset )
-    
-# find nearly matching beats between clips and group them
-import copy
-scratch_list = copy.deepcopy(beat_list)
-groups = []
-for i in range(len(scratch_list)-1):
-    beats1 = scratch_list[i]
-    for b1 in beats1:
-        if b1 < 0: continue
-        group = [ (i, b1) ]
-        for j in range(i+1, len(scratch_list)):
-            beats2 = scratch_list[j]
-            for n, b2 in enumerate(beats2):
-                if abs(b1 - b2) < 0.15:
-                    print("  track %d vs %d: %.3f %.3f" % (i, j, b1, b2))
-                    group.append( (j, b2) )
-                    beats2[n] = -1
-        if len(group) > 1:
-            groups.append(group)
-            
-print("beat groupings:")
-# compute average time for each beat group (add it and label it -1)
-for group in groups:
-    sum = 0
-    count = 0
-    for i, t in group:
-        sum += t
-        count += 1
-    average = sum / count
-    group.append( (-1, average) )
-    print(group)
 
-# make time remapping templates
-temperals = []
-map_list = []
-for i in range(len(beat_list)):
-    time_mapping = []
+if args.beat_sync:
+    # find nearly matching beats between clips and group them
+    import copy
+    scratch_list = copy.deepcopy(beat_list)
+    groups = []
+    for i in range(len(scratch_list)-1):
+        beats1 = scratch_list[i]
+        for b1 in beats1:
+            if b1 < 0: continue
+            group = [ (i, b1) ]
+            for j in range(i+1, len(scratch_list)):
+                beats2 = scratch_list[j]
+                for n, b2 in enumerate(beats2):
+                    if abs(b1 - b2) < 0.15:
+                        print("  track %d vs %d: %.3f %.3f" % (i, j, b1, b2))
+                        group.append( (j, b2) )
+                        beats2[n] = -1
+            if len(group) > 1:
+                groups.append(group)
+
+    print("beat groupings:")
+    # compute average time for each beat group (add it and label it -1)
     for group in groups:
-        for j, t in group[:-1]:
-            if i == j:
-                time_mapping.append( (t, group[-1][1]) )
-    time_mapping = sorted(time_mapping, key=lambda fields: fields[0])
-    map_list.append(time_mapping)
-    print("time_mapping:", time_mapping)
+        sum = 0
+        count = 0
+        for i, t in group:
+            sum += t
+            count += 1
+        average = sum / count
+        group.append( (-1, average) )
+        print(group)
 
-# deep dive, try to remap the timing of the clips for alignment ... scary part!
-for i, sample in enumerate(samples):
-    new = AudioSegment.empty()
-    sr = sample.frame_rate
-    offset = (clap_offset[i] / 1000) # secs
-    time_map = map_list[i]
-    for j in range(len(time_map)-1):
-        src_interval = time_map[j+1][0] - time_map[j][0]
-        dst_interval = time_map[j+1][1] - time_map[j][1]
-        speed = src_interval / dst_interval
-        print("intervals:", src_interval, dst_interval, "speed:", speed)
-        c1 = int(round( (time_map[j][0] + offset) * 1000 ))
-        c2 = int(round( (time_map[j+1][0] + offset) * 1000 ))
-        clip = sample[c1:c2]
-        #new.extend( librosa.effects.time_stretch(np.array(clip).astype('float'), scale) )
-        if abs(1.0 - speed) > 0.0001:
-            newclip = change_audioseg_tempo(clip, speed)
-        else:
-            print("straight copy")
-            newclip = clip
-        new += newclip
-        print(" ", c1, c2, len(sample), len(clip), len(newclip))
-    # c2 inherits last clip end, so add from there on to complete the clip
-    new += sample[c2:]
-    #playback.play(new)
-    temperals.append(new)
+    # make time remapping templates
+    temperals = []
+    map_list = []
+    for i in range(len(beat_list)):
+        time_mapping = []
+        for group in groups:
+            for j, t in group[:-1]:
+                if i == j:
+                    time_mapping.append( (t, group[-1][1]) )
+        time_mapping = sorted(time_mapping, key=lambda fields: fields[0])
+        map_list.append(time_mapping)
+        print("time_mapping:", time_mapping)
+
+    # deep dive, try to remap the timing of the clips for alignment ... scary part!
+    for i, sample in enumerate(samples):
+        new = AudioSegment.empty()
+        sr = sample.frame_rate
+        offset = (clap_offset[i] / 1000) # secs
+        time_map = map_list[i]
+        for j in range(len(time_map)-1):
+            src_interval = time_map[j+1][0] - time_map[j][0]
+            dst_interval = time_map[j+1][1] - time_map[j][1]
+            speed = src_interval / dst_interval
+            print("intervals:", src_interval, dst_interval, "speed:", speed)
+            c1 = int(round( (time_map[j][0] + offset) * 1000 ))
+            c2 = int(round( (time_map[j+1][0] + offset) * 1000 ))
+            clip = sample[c1:c2]
+            #new.extend( librosa.effects.time_stretch(np.array(clip).astype('float'), scale) )
+            if abs(1.0 - speed) > 0.0001:
+                newclip = change_audioseg_tempo(clip, speed)
+            else:
+                print("straight copy")
+                newclip = clip
+            new += newclip
+            print(" ", c1, c2, len(sample), len(clip), len(newclip))
+        # c2 inherits last clip end, so add from there on to complete the clip
+        new += sample[c2:]
+        #playback.play(new)
+        temperals.append(new)
      
+    # mix the temperals
+    print("mixing the temperals...")
+    mixed = None
+    for i, v in enumerate(args.videos):
+        print(" ", v)
+        sample = temperals[i]
+        if mixed is None:
+            mixed = sample
+        else:
+            mixed = mixed.overlay(sample)
+    print("playing beat synced audio...")
+    mixed.export("group.wav", format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
+    playback.play(mixed)
+    
+else:
+    # no beat syncing, just align and mix audio clips based on starting clap
+    print("straight mixing based on clap sync...")
+    mixed = None
+    for i, sample in enumerate(samples):
+        print(" ", args.videos[i])
+        sync_ms = clap_offset[i]
+        if mixed is None:
+            mixed = sample[sync_ms:]
+        else:
+            mixed = mixed.overlay(sample[sync_ms:])
+    print("playing clap synced audio...")
+    mixed.export("group.wav", format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
+    playback.play(mixed)
+
+# use ffmpeg to combine the video and audio tracks into the final movie
+from subprocess import call
+result = call(["ffmpeg", "-i", "group.mp4", "-i", "group.wav", "-c:v", "copy", "-c:a", "aac", "final.mp4"])
+print("ffmpeg result code:", result)
+
 # plot basic clip waveforms
 fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
 for i in range(len(raws)):
@@ -225,37 +261,4 @@ if True:
 
     plt.show()
 
-# do a quick mix of temperals
-print("quick mix of temperals...")
-mixed = None
-for i, v in enumerate(args.videos):
-    print(" ", v)
-    sample = temperals[i]
-    if mixed is None:
-        mixed = sample
-    else:
-        mixed = mixed.overlay(sample)
-print("playing quick sync combined audio...")
-playback.play(mixed)
-mixed.export("group.wav", format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
-
-# do a quick mix from starting clap
-print("quick mix based on clap sync...")
-mixed = None
-for i, v in enumerate(args.videos):
-    print(" ", v)
-    sample = samples[i]
-    sync_ms = clap_offset[i]
-    if mixed is None:
-        mixed = sample[sync_ms:]
-    else:
-        mixed = mixed.overlay(sample[sync_ms:])
-
-if True:
-    print("playing quick sync combined audio...")
-    playback.play(mixed)
     
-from subprocess import call
-result = call(["ffmpeg", "-i", "group.mp4", "-i", "group.wav", "-c:v", "copy", "-c:a", "aac", "final.mp4"])
-print("ffmpeg result code:", result)
-

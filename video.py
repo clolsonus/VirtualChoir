@@ -29,9 +29,8 @@ class VideoTrack:
 
     def skip_secs(self, seconds):
         skip_frames = int(round( seconds * self.fps ))
-        print("skipping first %d frames." % skip_frames)
+        print("skipping first %.1f seconds (%d frames.)" % (seconds, skip_frames))
         for i in range(skip_frames):
-            print(" skipping:", i)
             self.reader._readFrame()
 
     def next_frame(self):
