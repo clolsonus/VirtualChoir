@@ -10,6 +10,7 @@ from pydub import AudioSegment, playback  # pip install pydub
 import pyrubberband as pyrb               # pip install pyrubberband
 from scipy import signal                  # spectrogram
 
+import beats
 import video
 
 parser = argparse.ArgumentParser(description='virtual choir')
@@ -47,73 +48,19 @@ for v in args.videos:
     raws.append(raw)
 
 # analyze audio streams (using librosa functions)
-hop_length = 512
-onset_list = []
-time_list = []
-beat_list = []
-for i, raw in enumerate(raws):
-    sr = samples[i].frame_rate
-    #sync_ms = clap_offset[i]
-    #trimval = int(round(sync_ms * rate / 1000))
-    
-    # compute onset envelopes
-    oenv = librosa.onset.onset_strength(y=np.array(raw).astype('float'),
-                                        sr=sr, hop_length=hop_length)
-    t = librosa.times_like(oenv, sr=sr, hop_length=hop_length)
-    onset_list.append(oenv)
-    time_list.append(t)
-    
-    # make a list (times) of the dominant beats
-    in_beat = False
-    mean = np.mean(oenv)
-    std = np.std(oenv)
-    maximum = np.max(oenv) * 10
-    print(mean, std, maximum)
-    beat_max = 0
-    beat_time = 0
-    last_beat = None
-    beats = []
-    for i in range(0, len(t)):
-        # skip/ignore beats in the first 1/2 second
-        if t[i] < 0.5:
-            continue
-        if oenv[i] > 4*std:
-            in_beat = True
-        else:
-            if in_beat:
-                # just finished a beat
-                print("Beat: %.3f (%.1f)" % (beat_time, beat_max))
-                beats.append(beat_time)
-                if last_beat:
-                    interval = beat_time - last_beat
-                    last_beat = beat_time
-                else:
-                    last_beat = beat_time
-            in_beat = False
-            beat_max = 0
-        if in_beat:
-            if oenv[i] > beat_max:
-                beat_max = oenv[i]
-                beat_time = t[i]
-    beat_list.append(beats)
-    
-    intervals = []
-    for i in range(1, len(beats)):
-        intervals.append( beats[i] - beats[i-1] )
-    print(intervals)
-    print("median beat:", np.median(intervals))
+beats.analyze(samples, raws)
 
 # assume first detected beat is the clap sync
 clap_offset = []
-for i in range(len(beat_list)):
-    clap_offset.append( beat_list[i][0] * 1000) # ms units
+for i in range(len(beats.beat_list)):
+    clap_offset.append( beats.beat_list[i][0] * 1000) # ms units
 
 # shift all beat times for each clip so that the sync clap is at t=0.0
-for beats in beat_list:
-    offset = beats[0]
-    for i in range(len(beats)):
-        beats[i] -= offset
-    print(beats)
+for seq in beats.beat_list:
+    offset = seq[0]
+    for i in range(len(seq)):
+        seq[i] -= offset
+    print(seq)
 
 # render the new combined video
 video.render_combined_video( args.videos, clap_offset )
@@ -121,7 +68,7 @@ video.render_combined_video( args.videos, clap_offset )
 if args.beat_sync:
     # find nearly matching beats between clips and group them
     import copy
-    scratch_list = copy.deepcopy(beat_list)
+    scratch_list = copy.deepcopy(beats.beat_list)
     groups = []
     for i in range(len(scratch_list)-1):
         beats1 = scratch_list[i]
@@ -153,7 +100,7 @@ if args.beat_sync:
     # make time remapping templates
     temperals = []
     map_list = []
-    for i in range(len(beat_list)):
+    for i in range(len(beats.beat_list)):
         time_mapping = []
         for group in groups:
             for j, t in group[:-1]:
@@ -217,7 +164,9 @@ else:
             mixed = mixed.overlay(sample[sync_ms:])
     print("playing clap synced audio...")
     mixed.export("group.wav", format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
-    playback.play(mixed)
+    print("before")
+    # playback.play(mixed)
+    print("after")
 
 # use ffmpeg to combine the video and audio tracks into the final movie
 from subprocess import call
@@ -232,10 +181,11 @@ for i in range(len(raws)):
     librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
     ax[i].set(title=args.videos[i])
     ax[i].label_outer()
-    for b in beat_list[i]:
+    for b in beats.beat_list[i]:
         ax[i].axvline(x=b, color='b')
 
 # visualize audio streams (using librosa functions)
+beats.gen_plots(samples, raws, clap_offset, args.videos)
 if True:
     # plot original (unaligned) onset envelope peaks
     fig, ax = plt.subplots(nrows=len(onset_list), sharex=True, sharey=True)
