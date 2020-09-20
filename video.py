@@ -11,6 +11,8 @@ class VideoTrack:
         metadata = skvideo.io.ffprobe(file)
         #print(metadata.keys())
         #print(json.dumps(metadata["video"], indent=4))
+        if not "video" in metadata:
+            return False
         fps_string = metadata['video']['@avg_frame_rate']
         (num, den) = fps_string.split('/')
         self.fps = float(num) / float(den)
@@ -26,8 +28,11 @@ class VideoTrack:
 
         print("Opening ", file)
         self.reader = skvideo.io.FFmpegReader(file, inputdict={}, outputdict={})
-
+        return True
+    
     def skip_secs(self, seconds):
+        if not self.reader:
+            return
         skip_frames = int(round( seconds * self.fps ))
         print("skipping first %.2f seconds (%d frames.)" % (seconds, skip_frames))
         for i in range(skip_frames):
@@ -56,10 +61,13 @@ def render_combined_video( video_names, offsets ):
     videos = []
     for i, file in enumerate(video_names):
         v = VideoTrack()
-        v.open(file)
-        v.skip_secs(offsets[i] / 1000)
-        videos.append(v)
+        if v.open(file):
+            v.skip_secs(offsets[i] / 1000)
+            videos.append(v)
 
+    if len(videos) == 0:
+        return
+    
     # stats from first video
     fps = videos[0].fps
     w = videos[0].w
