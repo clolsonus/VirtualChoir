@@ -29,7 +29,7 @@ class VideoTrack:
 
     def skip_secs(self, seconds):
         skip_frames = int(round( seconds * self.fps ))
-        print("skipping first %.1f seconds (%d frames.)" % (seconds, skip_frames))
+        print("skipping first %.2f seconds (%d frames.)" % (seconds, skip_frames))
         for i in range(skip_frames):
             self.reader._readFrame()
 
@@ -37,6 +37,9 @@ class VideoTrack:
         try:
             frame = self.reader._readFrame()
         except:
+            return None
+        print(frame.shape)
+        if not len(frame):
             return None
         frame = frame[:,:,::-1]     # convert from RGB to BGR (to make opencv happy)
         return frame
