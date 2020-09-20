@@ -47,8 +47,12 @@ for v in args.videos:
     raw = mono.get_array_of_samples()
     raws.append(raw)
 
-# analyze audio streams (using librosa functions)
-beats.analyze(samples, raws)
+# analyze audio streams (using librosa functions) and save/load
+# results from previous run
+if not beats.load("beats.json", args.videos):
+    beats.analyze(samples, raws)
+    beats.save("beats.json", args.videos)
+beats.gen_plots(samples, raws, args.videos, clap_offset=None)
 
 # assume first detected beat is the clap sync
 clap_offset = []
@@ -119,17 +123,25 @@ if args.beat_sync:
         for j in range(len(time_map)-1):
             src_interval = time_map[j+1][0] - time_map[j][0]
             dst_interval = time_map[j+1][1] - time_map[j][1]
-            speed = src_interval / dst_interval
+            print("intervals:", src_interval, dst_interval)
+            if dst_interval < 0.2 or src_interval < 0.2:
+                speed = 1.0
+            else:
+                speed = src_interval / dst_interval
             print("intervals:", src_interval, dst_interval, "speed:", speed)
             c1 = int(round( (time_map[j][0] + offset) * 1000 ))
             c2 = int(round( (time_map[j+1][0] + offset) * 1000 ))
             clip = sample[c1:c2]
             #new.extend( librosa.effects.time_stretch(np.array(clip).astype('float'), scale) )
-            if abs(1.0 - speed) > 0.0001:
-                newclip = change_audioseg_tempo(clip, speed)
-            else:
+            if abs(1.0 - speed) < 0.0001:
                 print("straight copy")
                 newclip = clip
+            elif speed < 0.9 or speed > 1.1:
+                print("intervals too different, just straight copying")
+                newclip = clip
+            else:
+                # adjust clip length
+                newclip = change_audioseg_tempo(clip, speed)
             new += newclip
             print(" ", c1, c2, len(sample), len(clip), len(newclip))
         # c2 inherits last clip end, so add from there on to complete the clip

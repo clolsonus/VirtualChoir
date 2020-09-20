@@ -1,9 +1,11 @@
 # analyze audio streams (using librosa functions)
 
+import json
 import librosa
 import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 onset_list = []
 time_list = []
@@ -61,33 +63,75 @@ def analyze(samples, raws):
         intervals = []
         for i in range(1, len(beats)):
             intervals.append( beats[i] - beats[i-1] )
-        print(intervals)
+        print("intervals:", intervals)
         print("median beat:", np.median(intervals))
 
 # visualize audio streams (using librosa functions)
-def gen_plots(samples, raws, clap_offset, names):
+def gen_plots(samples, raws, names, clap_offset=None):
+    # plot basic clip waveforms
+    fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
+    for i in range(len(raws)):
+        sr = samples[i].frame_rate
+        if clap_offset is None:
+            trimval = 0
+        else:
+            trimval = int(round(clap_offset[i] * sr / 1000))
+        librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
+        ax[i].set(title=names[i])
+        ax[i].label_outer()
+        for b in beat_list[i]:
+            ax[i].axvline(x=b, color='b')
+
     # plot original (unaligned) onset envelope peaks
     fig, ax = plt.subplots(nrows=len(onset_list),
                            sharex=True, sharey=True)
     for i in range(len(onset_list)):
         ax[i].plot(time_list[i], onset_list[i])
 
-    # compute and plot chroma representation of clips (I notice the
-    # timescale has an odd scaling, but doesn't seem to be a factor of
-    # 2, or maybe it is, so ???)
+    # compute and plot chroma representation of clips (notice: work
+    # around displaying specshow that seems to assume stereo samples,
+    # but we are passing in mono here)
     chromas = []
     fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
     for i in range(len(raws)):
         sr = samples[i].frame_rate
-        trimval = int(round(clap_offset[i] * sr / 1000))
+        if clap_offset is None:
+            trimval = 0
+        else:
+            trimval = int(round(clap_offset[i] * sr / 1000))
         chroma = librosa.feature.chroma_cqt(y=np.array(raws[i][trimval:]).astype('float'),
                                             sr=sr, hop_length=hop_length)
         chromas.append(chroma)
         img = librosa.display.specshow(chroma, x_axis='time',
                                        y_axis='chroma',
-                                       hop_length=hop_length, ax=ax[i])
+                                       hop_length=int(hop_length*0.5), ax=ax[i])
         ax[i].set(title='Chroma Representation of ' + names[i])
     fig.colorbar(img, ax=ax)
 
     plt.show()
 
+def load(filename, names):
+    if not os.path.exists(filename):
+        return False
+    else:
+        beat_list.clear()
+        with open(filename, "r") as fp:
+            clips = json.load(fp)
+        for i, name in enumerate(names):
+            print("loading:", name)
+            beat_list.append( clips[name]["beats"] )
+        return True
+    
+def save(filename, names):
+    # create dictionary of beat maps (by clip name)
+    clips = {}
+    for i, name in enumerate(names):
+        clips[name] = {}
+        clips[name]["beats"] = []
+        for b in beat_list[i]:
+            # trim to 3 decimal places
+            clips[name]["beats"].append( int(round(b * 10000)) / 10000 )
+    print("clips:", clips)
+
+    with open(filename, "w") as fp:
+        json.dump(clips, fp, indent=4)
