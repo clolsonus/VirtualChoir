@@ -8,9 +8,10 @@ import numpy as np
 import os
 from pydub import AudioSegment, playback  # pip install pydub
 import pyrubberband as pyrb               # pip install pyrubberband
+import random
 from scipy import signal                  # spectrogram
 
-import beats
+import analyze
 import video
 
 parser = argparse.ArgumentParser(description='virtual choir')
@@ -18,17 +19,6 @@ parser.add_argument('project', help='project folder')
 #parser.add_argument('videos', metavar='videos', nargs='+', help='input videos')
 parser.add_argument('--beat-sync', action='store_true', help='do additional beat syncronization work to tighten up slight note timing misses')
 args = parser.parse_args()
-
-# find all the project clips (needs work?)
-clip_extensions = [ "aiff", "m4a", "mp3", "wav" ]
-clips = []
-for file in os.listdir(args.project):
-    basename, ext = os.path.splitext(file)
-    if ext[1:].lower() in clip_extensions:
-        clips.append(file)
-    else:
-        print("Unknown extenstion (skipping):", file)
-print("clips:", clips)
 
 # function copied from: https://stackoverflow.com/questions/51434897/how-to-change-audio-playback-speed-using-pydub
 def change_audioseg_tempo(segment, scale):
@@ -45,6 +35,52 @@ def change_audioseg_tempo(segment, scale):
     new_seg = AudioSegment(y.tobytes(), frame_rate=sr, sample_width=2, channels=channels)
     return new_seg
 
+def my_mix(samples, clap_offset):
+    print("straight mixing based on clap sync...")
+    y_mixed = None
+    for i, sample in enumerate(samples):
+        sample = sample.set_channels(2)
+        sample = sample.pan( random.uniform(-0.75, 0.75) )
+        sample = sample.fade_in(1000)
+        sample = sample.fade_out(1000)
+        sr = sample.frame_rate
+        sync_ms = clap_offset[i] + random.randrange(-20, 20)
+        y = np.array(sample[sync_ms:].get_array_of_samples()).astype('float')
+        #if sample.channels == 2:
+        #    y = y.reshape((-1, 2))
+        print(" ", y.shape)
+        if y_mixed is None:
+            y_mixed = y
+        else:
+            # extend y_mixed array length if needed
+            if y_mixed.shape[0] < y.shape[0]:
+                diff = y.shape[0] - y_mixed.shape[0]
+                print("extending accumulator by:", diff)
+                y_mixed = np.concatenate([y_mixed, np.zeros(diff)], axis=None)
+            elif y.shape[0] < y_mixed.shape[0]:
+                diff = y_mixed.shape[0] - y.shape[0]
+                print("extending sample by:", diff)
+                y = np.concatenate([y, np.zeros(diff)], axis=None)
+            y_mixed += y
+    y_mixed /= len(samples)
+    y_mixed = np.int16(y_mixed)
+    mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
+    print("playing clap synced audio...")
+    #mixed.export("group.wav", format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
+    playback.play(mixed)
+    return mixed
+    
+# find all the project clips (needs work?)
+clip_extensions = [ "aiff", "m4a", "mp3", "wav" ]
+clips = []
+for file in os.listdir(args.project):
+    basename, ext = os.path.splitext(file)
+    if ext[1:].lower() in clip_extensions:
+        clips.append(file)
+    else:
+        print("Unknown extenstion (skipping):", file)
+print("clips:", clips)
+
 # load samples, normalize, then generate a mono version for analysis
 print("loading samples...")
 samples = []
@@ -53,11 +89,11 @@ for clip in clips:
     basename, ext = os.path.splitext(clip)
     path = os.path.join(args.project, clip)
     sample = AudioSegment.from_file(path, ext[1:])
+    print(" ", clip, "rate:", sample.frame_rate, "channels:", sample.channels)
     sample = sample.set_frame_rate(48000)
-    print(" ", clip, sample.frame_rate)
     sample = sample.normalize()
     #sample = sample.apply_gain(-sample.max_dBFS)
-    sample = sample - 12
+    #sample = sample - 12
     samples.append(sample)
     mono = sample.set_channels(1) # convert to mono
     raw = mono.get_array_of_samples()
@@ -65,23 +101,23 @@ for clip in clips:
 
 # analyze audio streams (using librosa functions) and save/load
 # results from previous run
-if not beats.load(os.path.join(args.project, "beats.json"), clips):
-    beats.analyze(samples, raws)
-    beats.save(os.path.join(args.project, "beats.json"), clips)
-beats.gen_plots(samples, raws, clips, clap_offset=None)
+if not analyze.load(os.path.join(args.project, "beats.json"), clips):
+    analyze.analyze(samples, raws)
+    analyze.save(os.path.join(args.project, "beats.json"), clips)
+analyze.gen_plots(samples, raws, clips, clap_offset=None)
 
 clap_offset = []
 if False:
     # assume first detected beat is the clap sync
-    for i in range(len(beats.beat_list)):
-        clap_offset.append( beats.beat_list[i][0] * 1000) # ms units
+    for i in range(len(analyze.beat_list)):
+        clap_offset.append( analyze.beat_list[i][0] * 1000) # ms units
 if True:
     # use beat correlation to align clips
-    for i in range(len(beats.offset_list)):
-        clap_offset.append( -beats.offset_list[i] * 1000) # ms units
+    for i in range(len(analyze.offset_list)):
+        clap_offset.append( -analyze.offset_list[i] * 1000) # ms units
 
 # shift all beat times for each clip so that the sync clap is at t=0.0
-for seq in beats.beat_list:
+for seq in analyze.beat_list:
     offset = seq[0]
     for i in range(len(seq)):
         seq[i] -= offset
@@ -93,7 +129,7 @@ video.render_combined_video( clips, clap_offset )
 if args.beat_sync:
     # find nearly matching beats between clips and group them
     import copy
-    scratch_list = copy.deepcopy(beats.beat_list)
+    scratch_list = copy.deepcopy(analyze.beat_list)
     groups = []
     for i in range(len(scratch_list)-1):
         beats1 = scratch_list[i]
@@ -125,7 +161,7 @@ if args.beat_sync:
     # make time remapping templates
     temperals = []
     map_list = []
-    for i in range(len(beats.beat_list)):
+    for i in range(len(analyze.beat_list)):
         time_mapping = []
         for group in groups:
             for j, t in group[:-1]:
@@ -185,6 +221,7 @@ if args.beat_sync:
     playback.play(mixed)
     
 else:
+    my_mix(samples, clap_offset)
     # no beat syncing, just align and mix audio clips based on starting clap
     print("straight mixing based on clap sync...")
     mixed = None
@@ -212,12 +249,12 @@ for i in range(len(raws)):
     librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
     ax[i].set(title=clips[i])
     ax[i].label_outer()
-    for b in beats.beat_list[i]:
+    for b in analyze.beat_list[i]:
         ax[i].axvline(x=b, color='b')
 plt.show()
 
 # visualize audio streams (using librosa functions)
-beats.gen_plots(samples, raws, clap_offset, clips)
+analyze.gen_plots(samples, raws, clap_offset, clips)
 if True:
     # plot original (unaligned) onset envelope peaks
     fig, ax = plt.subplots(nrows=len(onset_list), sharex=True, sharey=True)
