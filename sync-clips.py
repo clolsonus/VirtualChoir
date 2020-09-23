@@ -12,6 +12,7 @@ import random
 from scipy import signal                  # spectrogram
 
 import analyze
+import mixer
 import video
 
 parser = argparse.ArgumentParser(description='virtual choir')
@@ -35,38 +36,6 @@ def change_audioseg_tempo(segment, scale):
     new_seg = AudioSegment(y.tobytes(), frame_rate=sr, sample_width=2, channels=channels)
     return new_seg
 
-def my_mixer(names, samples, sync_offset):
-    y_mixed = None
-    for i, sample in enumerate(samples):
-        print(" ", names[i], sync_offset[i])
-        sample = sample.set_channels(2)
-        sample = sample.pan( random.uniform(-0.75, 0.75) )
-        sample = sample.fade_in(1000)
-        sample = sample.fade_out(1000)
-        sr = sample.frame_rate
-        sync_ms = sync_offset[i] + random.randrange(-20, 20)
-        y = np.array(sample[sync_ms:].get_array_of_samples()).astype('float')
-        #if sample.channels == 2:
-        #    y = y.reshape((-1, 2))
-        #print(" ", y.shape)
-        if y_mixed is None:
-            y_mixed = y
-        else:
-            # extend y_mixed array length if needed
-            if y_mixed.shape[0] < y.shape[0]:
-                diff = y.shape[0] - y_mixed.shape[0]
-                #print("extending accumulator by:", diff)
-                y_mixed = np.concatenate([y_mixed, np.zeros(diff)], axis=None)
-            elif y.shape[0] < y_mixed.shape[0]:
-                diff = y_mixed.shape[0] - y.shape[0]
-                #print("extending sample by:", diff)
-                y = np.concatenate([y, np.zeros(diff)], axis=None)
-            y_mixed += y
-    y_mixed /= len(samples)
-    y_mixed = np.int16(y_mixed)
-    mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
-    return mixed
-    
 # find all the project clips (needs work?)
 clip_extensions = [ "aiff", "m4a", "mp3", "wav" ]
 clips = []
@@ -99,17 +68,17 @@ for clip in clips:
 # analyze audio streams (using librosa functions) and save/load
 # results from previous run
 analyze.compute(args.project, clips, samples, raws)
-analyze.gen_plots(samples, raws, clips, sync_offset=None)
+analyze.gen_plots(samples, raws, clips, sync_offsets=None)
 
-sync_offset = []
+sync_offsets = []
 if False:
     # assume first detected beat is the clap sync
     for i in range(len(analyze.beat_list)):
-        sync_offset.append( analyze.beat_list[i][0] * 1000) # ms units
+        sync_offsets.append( analyze.beat_list[i][0] * 1000) # ms units
 if True:
     # use beat correlation to align clips
     for i in range(len(analyze.offset_list)):
-        sync_offset.append( -analyze.offset_list[i] * 1000) # ms units
+        sync_offsets.append( -analyze.offset_list[i] * 1000) # ms units
 
 # shift all beat times for each clip so that the sync clap is at t=0.0
 for seq in analyze.beat_list:
@@ -119,7 +88,7 @@ for seq in analyze.beat_list:
     print(seq)
 
 # render the new combined video
-video.render_combined_video( clips, sync_offset )
+video.render_combined_video( clips, sync_offsets )
 
 if args.beat_sync:
     # find nearly matching beats between clips and group them
@@ -170,7 +139,7 @@ if args.beat_sync:
     for i, sample in enumerate(samples):
         new = AudioSegment.empty()
         sr = sample.frame_rate
-        offset = (sync_offset[i] / 1000) # secs
+        offset = (sync_offsets[i] / 1000) # secs
         time_map = map_list[i]
         for j in range(len(time_map)-1):
             src_interval = time_map[j+1][0] - time_map[j][0]
@@ -217,7 +186,8 @@ if args.beat_sync:
     
 else:
     print("Mixing samples...")
-    mixed = my_mixer(clips, samples, sync_offset)
+    mixed = mixer.combine(clips, samples, sync_offsets,
+                          pan_range=0.5, sync_jitter_ms=20)
     print("playing synced audio...")
     mixed.export("group.wav", format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
     playback.play(mixed)

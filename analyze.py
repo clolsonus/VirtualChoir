@@ -133,16 +133,16 @@ def compute(project, names, samples, raws):
         offset_list[i] -= max
 
 # visualize audio streams (using librosa functions)
-def gen_plots(samples, raws, names, sync_offset=None):
+def gen_plots(samples, raws, names, sync_offsets=None):
     print("Generating basic clip waveform...")
     # plot basic clip waveforms
     fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
     for i in range(len(raws)):
         sr = samples[i].frame_rate
-        if sync_offset is None:
+        if sync_offsets is None:
             trimval = 0
         else:
-            trimval = int(round(sync_offset[i] * sr / 1000))
+            trimval = int(round(sync_offsets[i] * sr / 1000))
         librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
         ax[i].set(title=names[i])
         ax[i].label_outer()
@@ -167,10 +167,10 @@ def gen_plots(samples, raws, names, sync_offset=None):
         for i in range(len(raws)):
             print(" ", names[i])
             sr = samples[i].frame_rate
-            if sync_offset is None:
+            if sync_offsets is None:
                 trimval = 0
             else:
-                trimval = int(round(sync_offset[i] * sr / 1000))
+                trimval = int(round(sync_offsets[i] * sr / 1000))
             chroma = librosa.feature.chroma_cqt(y=np.array(raws[i][trimval:]).astype('float'),
                                                 sr=sr, hop_length=hop_length)
             chromas.append(chroma)
