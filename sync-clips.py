@@ -42,7 +42,7 @@ audio_clips = []
 video_clips = []
 for file in os.listdir(args.project):
     basename, ext = os.path.splitext(file)
-    if file == "group.wav":
+    if basename == "group" or basename == "final":
         pass
     elif ext[1:].lower() in audio_extensions:
         audio_clips.append(file)
@@ -188,21 +188,17 @@ else:
 print("playing synced audio...")
 group_file = os.path.join(args.project, "group.wav")
 mixed.export(group_file, format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
-playback.play(mixed)
+#playback.play(mixed)
 
 # render the new combined video
-video.render_combined_video( video_clips, sync_offsets )
-
-# use ffmpeg to combine the video and audio tracks into the final movie
-from subprocess import call
-result = call(["ffmpeg", "-i", "group.mp4", "-i", "group.wav", "-c:v", "copy", "-c:a", "aac", "final.mp4"])
-print("ffmpeg result code:", result)
+video.render_combined_video( args.project, video_clips, sync_offsets )
+video.merge( args.project )
 
 # plot basic clip waveforms
 fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
 for i in range(len(raws)):
     sr = samples[i].frame_rate
-    trimval = int(round(sync_offset[i] * sr / 1000))
+    trimval = int(round(sync_offsets[i] * sr / 1000))
     librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
     ax[i].set(title=clips[i])
     ax[i].label_outer()
@@ -211,7 +207,7 @@ for i in range(len(raws)):
 plt.show()
 
 # visualize audio streams (using librosa functions)
-analyze.gen_plots(samples, raws, sync_offset, clips)
+analyze.gen_plots(samples, raws, sync_offsets, clips)
 if True:
     # plot original (unaligned) onset envelope peaks
     fig, ax = plt.subplots(nrows=len(onset_list), sharex=True, sharey=True)
@@ -225,7 +221,7 @@ if True:
     fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
     for i in range(len(raws)):
         sr = samples[i].frame_rate
-        trimval = int(round(sync_offset[i] * sr / 1000))
+        trimval = int(round(sync_offsets[i] * sr / 1000))
         chroma = librosa.feature.chroma_cqt(y=np.array(raws[i][trimval:]).astype('float'),
                                             sr=sr, hop_length=hop_length)
         chromas.append(chroma)

@@ -1,6 +1,7 @@
 import cv2
 import json
 import numpy as np
+import os
 import skvideo.io               # pip install sk-video
 
 class VideoTrack:
@@ -56,12 +57,13 @@ class VideoTrack:
 # fixme: deal with beat sync (maybe?)
 # fixme: better size & arrangement scheme
 # fixme: borders around frames?
-def render_combined_video( video_names, offsets ):
+def render_combined_video(project, video_names, offsets):
     # open all video clips and advance to clap sync point
     videos = []
     for i, file in enumerate(video_names):
         v = VideoTrack()
-        if v.open(file):
+        path = os.path.join(project, file)
+        if v.open(path):
             v.skip_secs(offsets[i] / 1000)
             videos.append(v)
 
@@ -90,7 +92,8 @@ def render_combined_video( video_names, offsets ):
         '-preset': 'medium',   # default compression
         '-r': str(fps)         # match input fps
     }
-    writer = skvideo.io.FFmpegWriter("group.mp4", inputdict=inputdict, outputdict=sane)
+    output_file = os.path.join(project, "group.mp4")
+    writer = skvideo.io.FFmpegWriter(output_file, inputdict=inputdict, outputdict=sane)
     done = False
     frames = [None] * len(videos)
     while not done:
@@ -117,3 +120,12 @@ def render_combined_video( video_names, offsets ):
             cv2.waitKey(1)
             writer.writeFrame(main_frame[:,:,::-1])  #write the frame as RGB not BGR
     writer.close()
+
+def merge(project):
+    # use ffmpeg to combine the video and audio tracks into the final movie
+    from subprocess import call
+    input_video = os.path.join(project, "group.mp4")
+    input_audio = os.path.join(project, "group.wav")
+    output_video = os.path.join(project, "final.mp4")
+    result = call(["ffmpeg", "-i", input_video, "-i", input_audio, "-c:v", "copy", "-c:a", "aac", output_video])
+    print("ffmpeg result code:", result)
