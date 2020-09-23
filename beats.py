@@ -10,6 +10,7 @@ import os
 onset_list = []
 time_list = []
 beat_list = []
+offset_list = []
 
 hop_length = 512
 
@@ -25,7 +26,7 @@ def analyze(samples, raws):
         t = librosa.times_like(oenv, sr=sr, hop_length=hop_length)
         onset_list.append(oenv)
         time_list.append(t)
-
+        
         # make a list (times) of the dominant beats
         in_beat = False
         mean = np.mean(oenv)
@@ -66,8 +67,47 @@ def analyze(samples, raws):
         print("intervals:", intervals)
         print("median beat:", np.median(intervals))
 
+    # correlation test
+    offset_list.append(0)
+    for i in range(1, len(onset_list)):
+        print(onset_list[0].shape, onset_list[i].shape)
+        ycorr = np.correlate(onset_list[0], onset_list[i], mode='full')
+        max_index = np.argmax(ycorr)
+        print("max index:", max_index)
+        if max_index > len(onset_list[i]):
+            shift = max_index - len(onset_list[i])
+            shift_time = time_list[0][shift]
+            plot1 = onset_list[0]
+            plot2 = np.concatenate([np.zeros(shift), onset_list[i]])
+            print(i, time_list[0][shift])
+        elif max_index < len(onset_list[i]):
+            shift = len(onset_list[i]) - max_index
+            shift_time = -time_list[i][shift]
+            plot1 = np.concatenate([np.zeros(shift), onset_list[0]], axis=None)
+            plot2 = onset_list[i]
+            print(i, -time_list[i][shift])
+        else:
+            plot1 = onset_list[0]
+            plot2 = onset_list[i]
+            shift = 0
+            shift_time = 0
+            print(i, 0)
+        offset_list.append(shift_time)
+        if False:
+            plt.figure()
+            plt.plot(ycorr)
+            plt.figure()
+            plt.plot(plot1, label=0)
+            plt.plot(plot2, label=i)
+            plt.legend()
+            plt.show()
+    max = np.max(offset_list)
+    for i in range(len(offset_list)):
+        offset_list[i] -= max
+
 # visualize audio streams (using librosa functions)
 def gen_plots(samples, raws, names, clap_offset=None):
+    print("Generating basic clip waveform...")
     # plot basic clip waveforms
     fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
     for i in range(len(raws)):
@@ -82,31 +122,36 @@ def gen_plots(samples, raws, names, clap_offset=None):
         for b in beat_list[i]:
             ax[i].axvline(x=b, color='b')
 
+    print("Onset envelope plot...")
     # plot original (unaligned) onset envelope peaks
     fig, ax = plt.subplots(nrows=len(onset_list),
                            sharex=True, sharey=True)
     for i in range(len(onset_list)):
         ax[i].plot(time_list[i], onset_list[i])
 
-    # compute and plot chroma representation of clips (notice: work
-    # around displaying specshow that seems to assume stereo samples,
-    # but we are passing in mono here)
-    chromas = []
-    fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
-    for i in range(len(raws)):
-        sr = samples[i].frame_rate
-        if clap_offset is None:
-            trimval = 0
-        else:
-            trimval = int(round(clap_offset[i] * sr / 1000))
-        chroma = librosa.feature.chroma_cqt(y=np.array(raws[i][trimval:]).astype('float'),
-                                            sr=sr, hop_length=hop_length)
-        chromas.append(chroma)
-        img = librosa.display.specshow(chroma, x_axis='time',
-                                       y_axis='chroma',
-                                       hop_length=int(hop_length*0.5), ax=ax[i])
-        ax[i].set(title='Chroma Representation of ' + names[i])
-    fig.colorbar(img, ax=ax)
+    # skip chroma plots for now on long samples, takes forever ...
+    if False:
+        # compute and plot chroma representation of clips (notice: work
+        # around displaying specshow that seems to assume stereo samples,
+        # but we are passing in mono here)
+        print("Generating chroma plot...")
+        chromas = []
+        fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
+        for i in range(len(raws)):
+            print(" ", names[i])
+            sr = samples[i].frame_rate
+            if clap_offset is None:
+                trimval = 0
+            else:
+                trimval = int(round(clap_offset[i] * sr / 1000))
+            chroma = librosa.feature.chroma_cqt(y=np.array(raws[i][trimval:]).astype('float'),
+                                                sr=sr, hop_length=hop_length)
+            chromas.append(chroma)
+            img = librosa.display.specshow(chroma, x_axis='time',
+                                           y_axis='chroma',
+                                           hop_length=int(hop_length*0.5), ax=ax[i])
+            ax[i].set(title='Chroma Representation of ' + names[i])
+        fig.colorbar(img, ax=ax)
 
     plt.show()
 
