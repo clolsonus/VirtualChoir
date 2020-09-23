@@ -42,7 +42,9 @@ audio_clips = []
 video_clips = []
 for file in os.listdir(args.project):
     basename, ext = os.path.splitext(file)
-    if ext[1:].lower() in audio_extensions:
+    if file == "group.wav":
+        pass
+    elif ext[1:].lower() in audio_extensions:
         audio_clips.append(file)
     elif ext[1:].lower() in video_extensions:
         video_clips.append(file)
@@ -77,26 +79,18 @@ analyze.compute(args.project, audio_clips, samples, raws)
 analyze.gen_plots(samples, raws, audio_clips, sync_offsets=None)
 
 sync_offsets = []
-if False:
+if args.beat_sync:
     # assume first detected beat is the clap sync
     for i in range(len(analyze.beat_list)):
         sync_offsets.append( analyze.beat_list[i][0] * 1000) # ms units
-if True:
-    # use beat correlation to align clips
-    for i in range(len(analyze.offset_list)):
-        sync_offsets.append( -analyze.offset_list[i] * 1000) # ms units
+    
+    # shift all beat times for each clip so that the sync clap is at t=0.0
+    for seq in analyze.beat_list:
+        offset = seq[0]
+        for i in range(len(seq)):
+            seq[i] -= offset
+        print(seq)
 
-# shift all beat times for each clip so that the sync clap is at t=0.0
-for seq in analyze.beat_list:
-    offset = seq[0]
-    for i in range(len(seq)):
-        seq[i] -= offset
-    print(seq)
-
-# render the new combined video
-video.render_combined_video( video_clips, sync_offsets )
-
-if args.beat_sync:
     # find nearly matching beats between clips and group them
     import copy
     scratch_list = copy.deepcopy(analyze.beat_list)
@@ -129,7 +123,7 @@ if args.beat_sync:
         print(group)
 
     # make time remapping templates
-    temperals = []
+    temporals = []
     map_list = []
     for i in range(len(analyze.beat_list)):
         time_mapping = []
@@ -174,30 +168,30 @@ if args.beat_sync:
         # c2 inherits last clip end, so add from there on to complete the clip
         new += sample[c2:]
         #playback.play(new)
-        temperals.append(new)
+        temporals.append(new)
      
-    # mix the temperals
-    print("mixing the temperals...")
-    mixed = None
-    for i, v in enumerate(clips):
-        print(" ", v)
-        sample = temperals[i]
-        if mixed is None:
-            mixed = sample
-        else:
-            mixed = mixed.overlay(sample)
-    print("playing beat synced audio...")
-    mixed.export("group.wav", format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
-    playback.play(mixed)
-    
+    # mix the temporals
+    print("Mixing samples...")
+    mixed = mixer.combine(audio_clips, temporals, sync_offsets=None,
+                          pan_range=0.5, sync_jitter_ms=0)
 else:
+    # use beat correlation to align clips
+    print("correlating samples")
+    analyze.correlate()
+    for i in range(len(analyze.offset_list)):
+        sync_offsets.append( -analyze.offset_list[i] * 1000) # ms units
+        
     print("Mixing samples...")
     mixed = mixer.combine(audio_clips, samples, sync_offsets,
                           pan_range=0.5, sync_jitter_ms=20)
-    print("playing synced audio...")
-    group_file = os.path.join(args.project, "group.wav")
-    mixed.export(group_file, format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
-    playback.play(mixed)
+    
+print("playing synced audio...")
+group_file = os.path.join(args.project, "group.wav")
+mixed.export(group_file, format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
+playback.play(mixed)
+
+# render the new combined video
+video.render_combined_video( video_clips, sync_offsets )
 
 # use ffmpeg to combine the video and audio tracks into the final movie
 from subprocess import call

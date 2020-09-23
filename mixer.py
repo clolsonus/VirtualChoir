@@ -2,16 +2,20 @@ import numpy as np
 from pydub import AudioSegment, playback  # pip install pydub
 import random
 
-def combine(names, samples, sync_offset, pan_range=0, sync_jitter_ms=0):
+def combine(names, samples, sync_offsets, pan_range=0, sync_jitter_ms=0):
     y_mixed = None
     for i, sample in enumerate(samples):
-        print(" ", names[i], sync_offset[i])
+        if sync_offsets is None:
+            sync_offset = 0
+        else:
+            sync_offset = sync_offsets[i]
+        print(" ", names[i], sync_offset)
         sample = sample.set_channels(2)
         sample = sample.pan( random.uniform(-0.75, 0.75) )
         sample = sample.fade_in(1000)
         sample = sample.fade_out(1000)
         sr = sample.frame_rate
-        sync_ms = sync_offset[i] + random.randrange(-20, 20)
+        sync_ms = sync_offset + random.randrange(-20, 20)
         y = np.array(sample[sync_ms:].get_array_of_samples()).astype('float')
         #if sample.channels == 2:
         #    y = y.reshape((-1, 2))

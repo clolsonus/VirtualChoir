@@ -94,6 +94,7 @@ def compute(project, names, samples, raws):
         #print("intervals:", intervals)
         #print("median beat:", np.median(intervals))
 
+def correlate():
     # compute relative time offsets by best correlation
     offset_list.append(0)
     for i in range(1, len(onset_list)):
