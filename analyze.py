@@ -14,13 +14,38 @@ offset_list = []
 
 hop_length = 512
 
-def analyze(samples, raws):
-    for i, raw in enumerate(raws):
-        sr = samples[i].frame_rate
-        #sync_ms = clap_offset[i]
-        #trimval = int(round(sync_ms * rate / 1000))
+def load(filename, names):
+    if not os.path.exists(filename):
+        return False
+    else:
+        beat_list.clear()
+        with open(filename, "r") as fp:
+            clips = json.load(fp)
+        for i, name in enumerate(names):
+            print("loading:", name)
+            beat_list.append( clips[name]["beats"] )
+        return True
+    
+def save(filename, names):
+    # create dictionary of beat maps (by clip name)
+    clips = {}
+    for i, name in enumerate(names):
+        clips[name] = {}
+        clips[name]["beats"] = []
+        for b in beat_list[i]:
+            # trim to 3 decimal places
+            clips[name]["beats"].append( int(round(b * 10000)) / 10000 )
+    print("clips:", clips)
 
+    with open(filename, "w") as fp:
+        json.dump(clips, fp, indent=4)
+
+def compute(project, names, samples, raws):
+    #beats_file = os.path.join(project, "beats.json")
+    print("Computing onset envelope and beats...")
+    for i, raw in enumerate(raws):
         # compute onset envelopes
+        sr = samples[i].frame_rate
         oenv = librosa.onset.onset_strength(y=np.array(raw).astype('float'),
                                             sr=sr, hop_length=hop_length)
         t = librosa.times_like(oenv, sr=sr, hop_length=hop_length)
@@ -32,7 +57,7 @@ def analyze(samples, raws):
         mean = np.mean(oenv)
         std = np.std(oenv)
         maximum = np.max(oenv) * 10
-        print(mean, std, maximum)
+        print(" ", names[i], mean, std, maximum)
         beat_max = 0
         beat_time = 0
         last_beat = None
@@ -46,7 +71,7 @@ def analyze(samples, raws):
             else:
                 if in_beat:
                     # just finished a beat
-                    print("Beat: %.3f (%.1f)" % (beat_time, beat_max))
+                    #print("Beat: %.3f (%.1f)" % (beat_time, beat_max))
                     beats.append(beat_time)
                     if last_beat:
                         interval = beat_time - last_beat
@@ -61,13 +86,15 @@ def analyze(samples, raws):
                     beat_time = t[i]
         beat_list.append(beats)
 
+    if False:
+        # compute intervals between beats (not used for anything right now)
         intervals = []
         for i in range(1, len(beats)):
             intervals.append( beats[i] - beats[i-1] )
-        print("intervals:", intervals)
-        print("median beat:", np.median(intervals))
+        #print("intervals:", intervals)
+        #print("median beat:", np.median(intervals))
 
-    # correlation test
+    # compute relative time offsets by best correlation
     offset_list.append(0)
     for i in range(1, len(onset_list)):
         print(onset_list[0].shape, onset_list[i].shape)
@@ -106,16 +133,16 @@ def analyze(samples, raws):
         offset_list[i] -= max
 
 # visualize audio streams (using librosa functions)
-def gen_plots(samples, raws, names, clap_offset=None):
+def gen_plots(samples, raws, names, sync_offset=None):
     print("Generating basic clip waveform...")
     # plot basic clip waveforms
     fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
     for i in range(len(raws)):
         sr = samples[i].frame_rate
-        if clap_offset is None:
+        if sync_offset is None:
             trimval = 0
         else:
-            trimval = int(round(clap_offset[i] * sr / 1000))
+            trimval = int(round(sync_offset[i] * sr / 1000))
         librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
         ax[i].set(title=names[i])
         ax[i].label_outer()
@@ -140,10 +167,10 @@ def gen_plots(samples, raws, names, clap_offset=None):
         for i in range(len(raws)):
             print(" ", names[i])
             sr = samples[i].frame_rate
-            if clap_offset is None:
+            if sync_offset is None:
                 trimval = 0
             else:
-                trimval = int(round(clap_offset[i] * sr / 1000))
+                trimval = int(round(sync_offset[i] * sr / 1000))
             chroma = librosa.feature.chroma_cqt(y=np.array(raws[i][trimval:]).astype('float'),
                                                 sr=sr, hop_length=hop_length)
             chromas.append(chroma)
@@ -155,28 +182,3 @@ def gen_plots(samples, raws, names, clap_offset=None):
 
     plt.show()
 
-def load(filename, names):
-    if not os.path.exists(filename):
-        return False
-    else:
-        beat_list.clear()
-        with open(filename, "r") as fp:
-            clips = json.load(fp)
-        for i, name in enumerate(names):
-            print("loading:", name)
-            beat_list.append( clips[name]["beats"] )
-        return True
-    
-def save(filename, names):
-    # create dictionary of beat maps (by clip name)
-    clips = {}
-    for i, name in enumerate(names):
-        clips[name] = {}
-        clips[name]["beats"] = []
-        for b in beat_list[i]:
-            # trim to 3 decimal places
-            clips[name]["beats"].append( int(round(b * 10000)) / 10000 )
-    print("clips:", clips)
-
-    with open(filename, "w") as fp:
-        json.dump(clips, fp, indent=4)
