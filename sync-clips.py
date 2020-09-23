@@ -8,7 +8,6 @@ import numpy as np
 import os
 from pydub import AudioSegment, playback  # pip install pydub
 import pyrubberband as pyrb               # pip install pyrubberband
-import random
 from scipy import signal                  # spectrogram
 
 import analyze
@@ -37,21 +36,28 @@ def change_audioseg_tempo(segment, scale):
     return new_seg
 
 # find all the project clips (needs work?)
-clip_extensions = [ "aiff", "m4a", "mp3", "wav" ]
-clips = []
+audio_extensions = [ "aiff", "m4a", "mp3", "wav" ]
+video_extensions = [ "avi", "mov", "mp4" ]
+audio_clips = []
+video_clips = []
 for file in os.listdir(args.project):
     basename, ext = os.path.splitext(file)
-    if ext[1:].lower() in clip_extensions:
-        clips.append(file)
+    if ext[1:].lower() in audio_extensions:
+        audio_clips.append(file)
+    elif ext[1:].lower() in video_extensions:
+        video_clips.append(file)
     else:
         print("Unknown extenstion (skipping):", file)
-print("clips:", clips)
+if not len(audio_clips):
+    audio_clips = video_clips
+print("audio clips:", audio_clips)
+print("video clips:", video_clips)
 
 # load samples, normalize, then generate a mono version for analysis
 print("loading samples...")
 samples = []
 raws = []
-for clip in clips:
+for clip in audio_clips:
     basename, ext = os.path.splitext(clip)
     path = os.path.join(args.project, clip)
     sample = AudioSegment.from_file(path, ext[1:])
@@ -67,8 +73,8 @@ for clip in clips:
 
 # analyze audio streams (using librosa functions) and save/load
 # results from previous run
-analyze.compute(args.project, clips, samples, raws)
-analyze.gen_plots(samples, raws, clips, sync_offsets=None)
+analyze.compute(args.project, audio_clips, samples, raws)
+analyze.gen_plots(samples, raws, audio_clips, sync_offsets=None)
 
 sync_offsets = []
 if False:
@@ -88,7 +94,7 @@ for seq in analyze.beat_list:
     print(seq)
 
 # render the new combined video
-video.render_combined_video( clips, sync_offsets )
+video.render_combined_video( video_clips, sync_offsets )
 
 if args.beat_sync:
     # find nearly matching beats between clips and group them
@@ -186,10 +192,11 @@ if args.beat_sync:
     
 else:
     print("Mixing samples...")
-    mixed = mixer.combine(clips, samples, sync_offsets,
+    mixed = mixer.combine(audio_clips, samples, sync_offsets,
                           pan_range=0.5, sync_jitter_ms=20)
     print("playing synced audio...")
-    mixed.export("group.wav", format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
+    group_file = os.path.join(args.project, "group.wav")
+    mixed.export(group_file, format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
     playback.play(mixed)
 
 # use ffmpeg to combine the video and audio tracks into the final movie
@@ -201,7 +208,7 @@ print("ffmpeg result code:", result)
 fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
 for i in range(len(raws)):
     sr = samples[i].frame_rate
-    trimval = int(round(clap_offset[i] * sr / 1000))
+    trimval = int(round(sync_offset[i] * sr / 1000))
     librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
     ax[i].set(title=clips[i])
     ax[i].label_outer()
@@ -210,7 +217,7 @@ for i in range(len(raws)):
 plt.show()
 
 # visualize audio streams (using librosa functions)
-analyze.gen_plots(samples, raws, clap_offset, clips)
+analyze.gen_plots(samples, raws, sync_offset, clips)
 if True:
     # plot original (unaligned) onset envelope peaks
     fig, ax = plt.subplots(nrows=len(onset_list), sharex=True, sharey=True)
@@ -224,7 +231,7 @@ if True:
     fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
     for i in range(len(raws)):
         sr = samples[i].frame_rate
-        trimval = int(round(clap_offset[i] * sr / 1000))
+        trimval = int(round(sync_offset[i] * sr / 1000))
         chroma = librosa.feature.chroma_cqt(y=np.array(raws[i][trimval:]).astype('float'),
                                             sr=sr, hop_length=hop_length)
         chromas.append(chroma)
