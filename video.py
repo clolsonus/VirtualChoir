@@ -10,6 +10,7 @@ class VideoTrack:
         self.reader = None
 
     def open(self, file):
+        print("video:", file)
         metadata = skvideo.io.ffprobe(file)
         #print(metadata.keys())
         #print(json.dumps(metadata["video"], indent=4))
@@ -37,7 +38,9 @@ class VideoTrack:
     def get_frame(self, time):
         # return the frame closest to the requested time
         frame_num = int(round(time * self.fps))
-        print("request frame num:", frame_num)
+        # print("request frame num:", frame_num)
+        if frame_num < 0:
+            return np.zeros(shape=[self.h, self.w, 3], dtype=np.uint8)
         while self.frame_counter < frame_num and not self.frame is None:
             try:
                 self.frame = self.reader._readFrame()
@@ -156,7 +159,6 @@ def render_combined_video(project, video_names, offsets):
                 scale_w = cell_w / w
                 scale_h = cell_h / h
                 if scale_w < scale_h:
-                    print("scale width")
                     frame_scale = cv2.resize(frame, (0,0), fx=scale_w,
                                              fy=scale_w,
                                              interpolation=cv2.INTER_AREA)

@@ -40,7 +40,7 @@ audio_extensions = [ "aiff", "m4a", "mp3", "wav" ]
 video_extensions = [ "avi", "mov", "mp4" ]
 audio_clips = []
 video_clips = []
-for file in os.listdir(args.project):
+for file in sorted(os.listdir(args.project)):
     basename, ext = os.path.splitext(file)
     if basename == "group" or basename == "final":
         pass
@@ -56,7 +56,7 @@ print("audio clips:", audio_clips)
 print("video clips:", video_clips)
 
 # load audio samples, normalize, then generate a mono version for analysis
-print("loading samples...")
+print("loading audio samples...")
 audio_samples = []
 audio_raws = []
 for clip in audio_clips:
@@ -66,26 +66,45 @@ for clip in audio_clips:
     print(" ", clip, "rate:", sample.frame_rate, "channels:", sample.channels)
     sample = sample.set_frame_rate(48000)
     sample = sample.normalize()
-    #sample = sample.apply_gain(-sample.max_dBFS)
-    #sample = sample - 12
     audio_samples.append(sample)
     mono = sample.set_channels(1) # convert to mono
     raw = mono.get_array_of_samples()
     audio_raws.append(raw)
 
-# analyze audio streams (using librosa functions) and save/load
-# results from previous run
-analyze.compute(args.project, audio_clips, audio_samples, audio_raws)
-analyze.gen_plots(audio_samples, audio_raws, audio_clips, sync_offsets=None)
+# load audio samples, normalize, then generate a mono version for analysis
+print("loading video samples...")
+video_samples = []
+video_raws = []
+for clip in video_clips:
+    basename, ext = os.path.splitext(clip)
+    path = os.path.join(args.project, clip)
+    sample = AudioSegment.from_file(path, ext[1:])
+    print(" ", clip, "rate:", sample.frame_rate, "channels:", sample.channels)
+    sample = sample.set_frame_rate(48000)
+    sample = sample.normalize()
+    video_samples.append(sample)
+    mono = sample.set_channels(1) # convert to mono
+    raw = mono.get_array_of_samples()
+    video_raws.append(raw)
+
+# analyze audio streams (using librosa functions)
+audio_group = analyze.SampleGroup()
+audio_group.compute(args.project, audio_clips, audio_samples, audio_raws)
+audio_group.gen_plots(audio_samples, audio_raws, audio_clips, sync_offsets=None)
+
+# analyze video streams (using librosa functions)
+video_group = analyze.SampleGroup()
+video_group.compute(args.project, video_clips, video_samples, video_raws)
+video_group.gen_plots(video_samples, video_raws, video_clips, sync_offsets=None)
 
 sync_offsets = []
 if args.beat_sync:
     # assume first detected beat is the clap sync
-    for i in range(len(analyze.beat_list)):
-        sync_offsets.append( analyze.beat_list[i][0] * 1000) # ms units
+    for i in range(len(audio_group.beat_list)):
+        sync_offsets.append( audio_group.beat_list[i][0] * 1000) # ms units
     
     # shift all beat times for each clip so that the sync clap is at t=0.0
-    for seq in analyze.beat_list:
+    for seq in audio_group.beat_list:
         offset = seq[0]
         for i in range(len(seq)):
             seq[i] -= offset
@@ -93,7 +112,7 @@ if args.beat_sync:
 
     # find nearly matching beats between clips and group them
     import copy
-    scratch_list = copy.deepcopy(analyze.beat_list)
+    scratch_list = copy.deepcopy(audio_group.beat_list)
     groups = []
     for i in range(len(scratch_list)-1):
         beats1 = scratch_list[i]
@@ -125,7 +144,7 @@ if args.beat_sync:
     # make time remapping templates
     temporals = []
     map_list = []
-    for i in range(len(analyze.beat_list)):
+    for i in range(len(audio_group.beat_list)):
         time_mapping = []
         for group in groups:
             for j, t in group[:-1]:
@@ -176,10 +195,11 @@ if args.beat_sync:
                           pan_range=0.5, sync_jitter_ms=0)
 else:
     # use beat correlation to align clips
-    print("correlating samples")
-    analyze.correlate()
-    for i in range(len(analyze.offset_list)):
-        sync_offsets.append( -analyze.offset_list[i] * 1000) # ms units
+    print("correlating audio samples")
+    audio_group.correlate( audio_group.onset_list[0],
+                           audio_group.time_list[0])
+    for i in range(len(audio_group.offset_list)):
+        sync_offsets.append( -audio_group.offset_list[i] * 1000) # ms units
         
     print("Mixing samples...")
     mixed = mixer.combine(audio_clips, audio_samples, sync_offsets,
@@ -190,9 +210,20 @@ group_file = os.path.join(args.project, "group.wav")
 mixed.export(group_file, format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 #playback.play(mixed)
 
-# render the new combined video
-video.render_combined_video( args.project, video_clips, sync_offsets )
-video.merge( args.project )
+if len(video_clips):
+    # use beat correlation to align video clips with first audio clip
+    print("correlating video samples")
+    video_offsets = []
+    video_group.correlate( audio_group.onset_list[0],
+                           audio_group.time_list[0],
+                           offset_shift=audio_group.shift,
+                           plot=True)
+    for i in range(len(video_group.offset_list)):
+        video_offsets.append( -video_group.offset_list[i] * 1000) # ms units
+        
+    # render the new combined video
+    video.render_combined_video( args.project, video_clips, video_offsets )
+    video.merge( args.project )
 
 # plot basic clip waveforms
 fig, ax = plt.subplots(nrows=len(audio_raws), sharex=True, sharey=True)
@@ -202,12 +233,12 @@ for i in range(len(audio_raws)):
     librosa.display.waveplot(np.array(audio_raws[i][trimval:]).astype('float'), sr=audio_samples[i].frame_rate, ax=ax[i])
     ax[i].set(title=clips[i])
     ax[i].label_outer()
-    for b in analyze.beat_list[i]:
+    for b in audio_group.beat_list[i]:
         ax[i].axvline(x=b, color='b')
 plt.show()
 
 # visualize audio streams (using librosa functions)
-analyze.gen_plots(audio_samples, audio_raws, sync_offsets, clips)
+audio_group.gen_plots(audio_samples, audio_raws, sync_offsets, clips)
 if True:
     # plot original (unaligned) onset envelope peaks
     fig, ax = plt.subplots(nrows=len(onset_list), sharex=True, sharey=True)
