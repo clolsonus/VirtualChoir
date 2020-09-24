@@ -1,5 +1,6 @@
 import cv2
 import json
+import math
 import numpy as np
 import os
 import skvideo.io               # pip install sk-video
@@ -58,6 +59,10 @@ class VideoTrack:
 # fixme: better size & arrangement scheme
 # fixme: borders around frames?
 def render_combined_video(project, video_names, offsets):
+    # 1080p
+    output_w = 1920
+    output_h = 1080
+    
     # open all video clips and advance to clap sync point
     videos = []
     for i, file in enumerate(video_names):
@@ -69,6 +74,18 @@ def render_combined_video(project, video_names, offsets):
 
     if len(videos) == 0:
         return
+
+    cols = int(math.sqrt(len(videos)))
+    rows = int(math.sqrt(len(videos)))
+    if cols * rows < len(videos):
+        cols += 1
+    if cols * rows < len(videos):
+        rows += 1
+    print("video grid:", cols, "x", rows)
+    cell_w = int(output_w / cols)
+    cell_h = int(output_h / rows)
+    cell_aspect = cell_w / cell_h
+    print("  cell size:", cell_w, "x", cell_h, "aspect:", cell_aspect)
     
     # stats from first video
     fps = videos[0].fps
@@ -102,8 +119,20 @@ def render_combined_video(project, video_names, offsets):
             frame = v.next_frame()
             if not frame is None:
                 done = False
-                frame_scale = cv2.resize(frame, (0,0), fx=0.25, fy=0.25,
-                                 interpolation=cv2.INTER_AREA)
+                (h, w) = frame.shape[:2]
+                aspect = w/h
+                scale_w = cell_w / w
+                scale_h = cell_h / h
+                if scale_w < scale_h:
+                    print("scale width")
+                    frame_scale = cv2.resize(frame, (0,0), fx=scale_w,
+                                             fy=scale_w,
+                                             interpolation=cv2.INTER_AREA)
+                else:
+                    frame_scale = cv2.resize(frame, (0,0), fx=scale_h,
+                                             fy=scale_h,
+                                             interpolation=cv2.INTER_AREA)
+                    
                 frames[i] = frame_scale
                 # cv2.imshow(video_names[i], frame_scale)
             else:
@@ -112,10 +141,18 @@ def render_combined_video(project, video_names, offsets):
                 if np.any(frames[i]):
                     done = False
         if not done:
-            main_frame = np.zeros(shape=[frames[0].shape[0], frames[0].shape[1]*4, frames[0].shape[2]], dtype=np.uint8)
+            main_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
+            row = 0
+            col = 0
             for i, f in enumerate(frames):
                 if not f is None:
-                    main_frame[0:f.shape[0],f.shape[1]*i:f.shape[1]*i+f.shape[1]] = f
+                    x = col * cell_w
+                    y = row * cell_h
+                    main_frame[y:y+f.shape[0],x:x+f.shape[1]] = f
+                row += 1
+                if row >= rows:
+                    row = 0
+                    col += 1
             cv2.imshow("main", main_frame)
             cv2.waitKey(1)
             writer.writeFrame(main_frame[:,:,::-1])  #write the frame as RGB not BGR
