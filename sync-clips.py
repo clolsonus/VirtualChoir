@@ -55,10 +55,10 @@ if not len(audio_clips):
 print("audio clips:", audio_clips)
 print("video clips:", video_clips)
 
-# load samples, normalize, then generate a mono version for analysis
+# load audio samples, normalize, then generate a mono version for analysis
 print("loading samples...")
-samples = []
-raws = []
+audio_samples = []
+audio_raws = []
 for clip in audio_clips:
     basename, ext = os.path.splitext(clip)
     path = os.path.join(args.project, clip)
@@ -68,15 +68,15 @@ for clip in audio_clips:
     sample = sample.normalize()
     #sample = sample.apply_gain(-sample.max_dBFS)
     #sample = sample - 12
-    samples.append(sample)
+    audio_samples.append(sample)
     mono = sample.set_channels(1) # convert to mono
     raw = mono.get_array_of_samples()
-    raws.append(raw)
+    audio_raws.append(raw)
 
 # analyze audio streams (using librosa functions) and save/load
 # results from previous run
-analyze.compute(args.project, audio_clips, samples, raws)
-analyze.gen_plots(samples, raws, audio_clips, sync_offsets=None)
+analyze.compute(args.project, audio_clips, audio_samples, audio_raws)
+analyze.gen_plots(audio_samples, audio_raws, audio_clips, sync_offsets=None)
 
 sync_offsets = []
 if args.beat_sync:
@@ -136,7 +136,7 @@ if args.beat_sync:
         print("time_mapping:", time_mapping)
 
     # deep dive, try to remap the timing of the clips for alignment ... scary part!
-    for i, sample in enumerate(samples):
+    for i, sample in enumerate(audio_samples):
         new = AudioSegment.empty()
         sr = sample.frame_rate
         offset = (sync_offsets[i] / 1000) # secs
@@ -182,7 +182,7 @@ else:
         sync_offsets.append( -analyze.offset_list[i] * 1000) # ms units
         
     print("Mixing samples...")
-    mixed = mixer.combine(audio_clips, samples, sync_offsets,
+    mixed = mixer.combine(audio_clips, audio_samples, sync_offsets,
                           pan_range=0.5, sync_jitter_ms=20)
     
 print("playing synced audio...")
@@ -195,11 +195,11 @@ video.render_combined_video( args.project, video_clips, sync_offsets )
 video.merge( args.project )
 
 # plot basic clip waveforms
-fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
-for i in range(len(raws)):
-    sr = samples[i].frame_rate
+fig, ax = plt.subplots(nrows=len(audio_raws), sharex=True, sharey=True)
+for i in range(len(audio_raws)):
+    sr = audio_samples[i].frame_rate
     trimval = int(round(sync_offsets[i] * sr / 1000))
-    librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
+    librosa.display.waveplot(np.array(audio_raws[i][trimval:]).astype('float'), sr=audio_samples[i].frame_rate, ax=ax[i])
     ax[i].set(title=clips[i])
     ax[i].label_outer()
     for b in analyze.beat_list[i]:
@@ -207,7 +207,7 @@ for i in range(len(raws)):
 plt.show()
 
 # visualize audio streams (using librosa functions)
-analyze.gen_plots(samples, raws, sync_offsets, clips)
+analyze.gen_plots(audio_samples, audio_raws, sync_offsets, clips)
 if True:
     # plot original (unaligned) onset envelope peaks
     fig, ax = plt.subplots(nrows=len(onset_list), sharex=True, sharey=True)
@@ -218,11 +218,11 @@ if True:
     # timescale has an odd scaling, but doesn't seem to be a factor of
     # 2, or maybe it is, so ???)
     chromas = []
-    fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
-    for i in range(len(raws)):
-        sr = samples[i].frame_rate
+    fig, ax = plt.subplots(nrows=len(audio_raws), sharex=True, sharey=True)
+    for i in range(len(audio_raws)):
+        sr = audio_samples[i].frame_rate
         trimval = int(round(sync_offsets[i] * sr / 1000))
-        chroma = librosa.feature.chroma_cqt(y=np.array(raws[i][trimval:]).astype('float'),
+        chroma = librosa.feature.chroma_cqt(y=np.array(audio_raws[i][trimval:]).astype('float'),
                                             sr=sr, hop_length=hop_length)
         chromas.append(chroma)
         img = librosa.display.specshow(chroma, x_axis='time',

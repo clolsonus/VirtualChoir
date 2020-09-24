@@ -22,6 +22,8 @@ class VideoTrack:
         self.w = int(metadata['video']['@width'])
         self.h = int(metadata['video']['@height'])
         self.total_frames = int(round(float(metadata['video']['@duration']) * self.fps))
+        self.frame_counter = -1
+        self.frame = []
 
         print('fps:', self.fps)
         print('codec:', codec)
@@ -31,7 +33,39 @@ class VideoTrack:
         print("Opening ", file)
         self.reader = skvideo.io.FFmpegReader(file, inputdict={}, outputdict={})
         return True
-    
+
+    def get_frame(self, time):
+        # return the frame closest to the requested time
+        frame_num = int(round(time * self.fps))
+        print("request frame num:", frame_num)
+        while self.frame_counter < frame_num and not self.frame is None:
+            try:
+                self.frame = self.reader._readFrame()
+                self.frame = self.frame[:,:,::-1]
+                self.frame_counter += 1
+                if not len(self.frame):
+                    self.frame = None
+            except:
+                self.frame = None
+        return self.frame
+        
+    def get_frame_interp(self, time):
+        # return an interpolated frame at 'time'.  Because the video
+        # streams are sequential, never ask for a time earlier than
+        # the previous request!
+        frame_num = int(round(time * self.fps))
+        print("request frame num:", frame_num)
+        while self.frame_counter < frame_num and not self.frame is None:
+            try:
+                self.frame = self.reader._readFrame()
+                self.frame = self.frame[:,:,::-1]
+                self.frame_counter += 1
+                if not len(self.frame):
+                    self.frame = None
+            except:
+                self.frame = None
+        return self.frame
+        
     def skip_secs(self, seconds):
         if not self.reader:
             return
@@ -45,7 +79,6 @@ class VideoTrack:
             frame = self.reader._readFrame()
         except:
             return None
-        print(frame.shape)
         if not len(frame):
             return None
         frame = frame[:,:,::-1]     # convert from RGB to BGR (to make opencv happy)
@@ -62,6 +95,7 @@ def render_combined_video(project, video_names, offsets):
     # 1080p
     output_w = 1920
     output_h = 1080
+    output_fps = 30
     
     # open all video clips and advance to clap sync point
     videos = []
@@ -69,7 +103,7 @@ def render_combined_video(project, video_names, offsets):
         v = VideoTrack()
         path = os.path.join(project, file)
         if v.open(path):
-            v.skip_secs(offsets[i] / 1000)
+            #v.skip_secs(offsets[i] / 1000)
             videos.append(v)
 
     if len(videos) == 0:
@@ -87,36 +121,34 @@ def render_combined_video(project, video_names, offsets):
     cell_aspect = cell_w / cell_h
     print("  cell size:", cell_w, "x", cell_h, "aspect:", cell_aspect)
     
-    # stats from first video
-    fps = videos[0].fps
-    w = videos[0].w
-    h = videos[0].h
     # open writer for output
     inputdict = {
-        '-r': str(fps)
+        '-r': str(output_fps)
     }
     lossless = {
         # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
         '-vcodec': 'libx264',  # use the h.264 codec
         '-crf': '0',           # set the constant rate factor to 0, (lossless)
         '-preset': 'veryslow', # maximum compression
-        '-r': str(fps)         # match input fps
+        '-r': str(output_fps)  # match input fps
     }
     sane = {
         # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
         '-vcodec': 'libx264',  # use the h.264 codec
         '-crf': '17',          # visually lossless (or nearly so)
         '-preset': 'medium',   # default compression
-        '-r': str(fps)         # match input fps
+        '-r': str(output_fps)  # match input fps
     }
     output_file = os.path.join(project, "group.mp4")
     writer = skvideo.io.FFmpegWriter(output_file, inputdict=inputdict, outputdict=sane)
     done = False
     frames = [None] * len(videos)
+    output_time = 0
     while not done:
         done = True
         for i, v in enumerate(videos):
-            frame = v.next_frame()
+            offset_sec = offsets[i] / 1000
+            frame = v.get_frame(output_time + offset_sec)
             if not frame is None:
                 done = False
                 (h, w) = frame.shape[:2]
@@ -156,6 +188,7 @@ def render_combined_video(project, video_names, offsets):
             cv2.imshow("main", main_frame)
             cv2.waitKey(1)
             writer.writeFrame(main_frame[:,:,::-1])  #write the frame as RGB not BGR
+            output_time += 1 / output_fps
     writer.close()
 
 def merge(project):
