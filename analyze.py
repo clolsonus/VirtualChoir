@@ -15,6 +15,7 @@ class SampleGroup():
         self.time_list = []
         self.beat_list = []
         self.offset_list = []
+        self.intensity_list = []
     
     def load(self, filename, names):
         if not os.path.exists(filename):
@@ -42,6 +43,14 @@ class SampleGroup():
         with open(filename, "w") as fp:
             json.dump(clips, fp, indent=4)
 
+    def intensity(self, raw):
+        intense = []
+        base = 0
+        while base < len(raw):
+            intense.append(np.max(raw[base:base+hop_length]))
+            base += hop_length
+        return np.array(intense).astype('float')
+        
     def compute(self, project, names, samples, raws):
         #beats_file = os.path.join(project, "beats.json")
         print("Computing onset envelope and beats...")
@@ -54,6 +63,8 @@ class SampleGroup():
             self.onset_list.append(oenv)
             self.time_list.append(t)
 
+            self.intensity_list.append( self.intensity(raw) )
+            
             # make a list (times) of the dominant beats
             in_beat = False
             mean = np.mean(oenv)
@@ -68,7 +79,7 @@ class SampleGroup():
                 # skip/ignore beats in the first 1/2 second
                 if t[i] < 0.5:
                     continue
-                if oenv[i] > 4*std:
+                if oenv[i] > 5*std:
                     in_beat = True
                 else:
                     if in_beat:
@@ -96,10 +107,10 @@ class SampleGroup():
             #print("intervals:", intervals)
             #print("median beat:", np.median(intervals))
 
-    def correlate(self, onset_ref, time_ref, offset_shift=None, plot=False):
+    def correlate_by_beats(self, onset_ref, time_ref,
+                           offset_shift=None, plot=False):
         # compute relative time offsets by best correlation
-        self.offset_list.append(0)
-        for i in range(1, len(self.onset_list)):
+        for i in range(0, len(self.onset_list)):
             print(onset_ref.shape, self.onset_list[i].shape)
             ycorr = np.correlate(onset_ref, self.onset_list[i], mode='full')
             max_index = np.argmax(ycorr)
@@ -119,6 +130,50 @@ class SampleGroup():
             else:
                 plot1 = onset_ref
                 plot2 = self.onset_list[i]
+                shift = 0
+                shift_time = 0
+                print(i, 0)
+            self.offset_list.append(shift_time)
+            if plot:
+                plt.figure()
+                plt.plot(ycorr)
+                plt.figure()
+                plt.plot(plot1, label=0)
+                plt.plot(plot2, label=i)
+                plt.legend()
+                plt.show()
+        if offset_shift is None:
+            self.shift = np.max(self.offset_list)
+        else:
+            self.shift = offset_shift
+        self.max_index = np.argmax(self.offset_list)
+        for i in range(len(self.offset_list)):
+            self.offset_list[i] -= self.shift
+
+    def correlate_by_intensity(self, intensity_ref, time_ref,
+                               offset_shift=None, plot=False):
+        # compute relative time offsets by best correlation
+        for i in range(0, len(self.intensity_list)):
+            print(intensity_ref.shape, self.intensity_list[i].shape)
+            ycorr = np.correlate(intensity_ref, self.intensity_list[i],
+                                 mode='full')
+            max_index = np.argmax(ycorr)
+            print("max index:", max_index)
+            if max_index > len(self.intensity_list[i]):
+                shift = max_index - len(self.intensity_list[i])
+                shift_time = time_ref[shift]
+                plot1 = intensity_ref
+                plot2 = np.concatenate([np.zeros(shift), self.intensity_list[i]])
+                print(i, time_ref[shift])
+            elif max_index < len(self.intensity_list[i]):
+                shift = len(self.intensity_list[i]) - max_index
+                shift_time = -self.time_list[i][shift]
+                plot1 = np.concatenate([np.zeros(shift), intensity_ref], axis=None)
+                plot2 = self.intensity_list[i]
+                print(i, -self.time_list[i][shift])
+            else:
+                plot1 = intensity_ref
+                plot2 = self.intensity_list[i]
                 shift = 0
                 shift_time = 0
                 print(i, 0)
@@ -163,6 +218,17 @@ class SampleGroup():
         for i in range(len(self.onset_list)):
             ax[i].plot(self.time_list[i], self.onset_list[i])
 
+        print("Intensity plot...")
+        fig, ax = plt.subplots(nrows=len(raws),
+                               sharex=True, sharey=True)
+        for i in range(len(raws)):
+            #ax[i].plot(self.time_list[i], self.onset_list[i])
+            a = len(self.time_list[i])
+            b = len(self.intensity_list[i])
+            min = np.min([a, b])
+            print(i, len(self.time_list[i]), len(self.intensity_list[i]))
+            ax[i].plot(self.time_list[i][:min], self.intensity_list[i][:min])
+        
         # skip chroma plots for now on long samples, takes forever ...
         if False:
             # compute and plot chroma representation of clips (notice: work

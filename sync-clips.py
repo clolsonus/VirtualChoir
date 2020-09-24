@@ -81,7 +81,11 @@ for clip in video_clips:
     sample = AudioSegment.from_file(path, ext[1:])
     print(" ", clip, "rate:", sample.frame_rate, "channels:", sample.channels)
     sample = sample.set_frame_rate(48000)
+    from pydub import scipy_effects
+    #sample = scipy_effects.band_pass_filter(sample, 130, 523) #C3-C5
+    sample = scipy_effects.band_pass_filter(sample, 200, 500) # ~G3 - ~B4
     sample = sample.normalize()
+    #playback.play(sample)
     video_samples.append(sample)
     mono = sample.set_channels(1) # convert to mono
     raw = mono.get_array_of_samples()
@@ -196,8 +200,11 @@ if args.beat_sync:
 else:
     # use beat correlation to align clips
     print("correlating audio samples")
-    audio_group.correlate( audio_group.onset_list[0],
-                           audio_group.time_list[0])
+    #audio_group.correlate_by_beats( audio_group.onset_list[0],
+    #                                audio_group.time_list[0])
+    audio_group.correlate_by_beats( audio_group.onset_list[0],
+                                    audio_group.time_list[0],
+                                    plot=True)
     for i in range(len(audio_group.offset_list)):
         sync_offsets.append( -audio_group.offset_list[i] * 1000) # ms units
         
@@ -214,10 +221,10 @@ if len(video_clips):
     # use beat correlation to align video clips with first audio clip
     print("correlating video samples")
     video_offsets = []
-    video_group.correlate( audio_group.onset_list[0],
-                           audio_group.time_list[0],
-                           offset_shift=audio_group.shift,
-                           plot=True)
+    video_group.correlate_by_intensity( audio_group.intensity_list[0],
+                                        audio_group.time_list[0],
+                                        offset_shift=audio_group.shift,
+                                        plot=True)
     for i in range(len(video_group.offset_list)):
         video_offsets.append( -video_group.offset_list[i] * 1000) # ms units
         
