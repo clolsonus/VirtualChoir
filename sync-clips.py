@@ -200,14 +200,15 @@ if args.beat_sync:
 else:
     # use beat correlation to align clips
     print("correlating audio samples")
-    #audio_group.correlate_by_beats( audio_group.onset_list[0],
-    #                                audio_group.time_list[0])
     audio_group.correlate_by_beats( audio_group.onset_list[0],
                                     audio_group.time_list[0],
-                                    plot=True)
+                                    plot=False)
+    #audio_group.correlate_by_intensity( audio_group.intensity_list[0],
+    #                                    audio_group.time_list[0],
+    #                                    plot=True)
     for i in range(len(audio_group.offset_list)):
         sync_offsets.append( -audio_group.offset_list[i] * 1000) # ms units
-        
+
     print("Mixing samples...")
     mixed = mixer.combine(audio_clips, audio_samples, sync_offsets,
                           pan_range=0.5, sync_jitter_ms=20)
@@ -224,7 +225,7 @@ if len(video_clips):
     video_group.correlate_by_intensity( audio_group.intensity_list[0],
                                         audio_group.time_list[0],
                                         offset_shift=audio_group.shift,
-                                        plot=True)
+                                        plot=False)
     for i in range(len(video_group.offset_list)):
         video_offsets.append( -video_group.offset_list[i] * 1000) # ms units
         

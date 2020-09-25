@@ -158,16 +158,34 @@ def render_combined_video(project, video_names, offsets):
                 aspect = w/h
                 scale_w = cell_w / w
                 scale_h = cell_h / h
-                if scale_w < scale_h:
-                    frame_scale = cv2.resize(frame, (0,0), fx=scale_w,
-                                             fy=scale_w,
-                                             interpolation=cv2.INTER_AREA)
-                else:
-                    frame_scale = cv2.resize(frame, (0,0), fx=scale_h,
-                                             fy=scale_h,
-                                             interpolation=cv2.INTER_AREA)
-                    
-                frames[i] = frame_scale
+                #option = "fit"
+                option = "zoom"
+                if option == "fit":
+                    if scale_w < scale_h:
+                        frame_scale = cv2.resize(frame, (0,0), fx=scale_w,
+                                                 fy=scale_w,
+                                                 interpolation=cv2.INTER_AREA)
+                    else:
+                        frame_scale = cv2.resize(frame, (0,0), fx=scale_h,
+                                                 fy=scale_h,
+                                                 interpolation=cv2.INTER_AREA)
+                    frames[i] = frame_scale
+                elif option == "zoom":
+                    if scale_w < scale_h:
+                        frame_scale = cv2.resize(frame, (0,0), fx=scale_h,
+                                                 fy=scale_h,
+                                                 interpolation=cv2.INTER_AREA)
+                        (tmp_h, tmp_w) = frame_scale.shape[:2]
+                        cut = int((tmp_w - cell_w) * 0.5)
+                        frame_scale = frame_scale[:,cut:cut+cell_w]
+                    else:
+                        frame_scale = cv2.resize(frame, (0,0), fx=scale_w,
+                                                 fy=scale_w,
+                                                 interpolation=cv2.INTER_AREA)
+                        (tmp_h, tmp_w) = frame_scale.shape[:2]
+                        cut = int((tmp_h - cell_h) * 0.5)
+                        frame_scale = frame_scale[cut:cut+cell_h,:]
+                    frames[i] = frame_scale
                 # cv2.imshow(video_names[i], frame_scale)
             else:
                 # fade
@@ -183,10 +201,10 @@ def render_combined_video(project, video_names, offsets):
                     x = col * cell_w
                     y = row * cell_h
                     main_frame[y:y+f.shape[0],x:x+f.shape[1]] = f
-                row += 1
-                if row >= rows:
-                    row = 0
-                    col += 1
+                col += 1
+                if col >= cols:
+                    col = 0
+                    row += 1
             cv2.imshow("main", main_frame)
             cv2.waitKey(1)
             writer.writeFrame(main_frame[:,:,::-1])  #write the frame as RGB not BGR
