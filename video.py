@@ -99,6 +99,7 @@ def render_combined_video(project, video_names, offsets):
     output_w = 1920
     output_h = 1080
     output_fps = 30
+    border = 10
     
     # open all video clips and advance to clap sync point
     videos = []
@@ -119,9 +120,12 @@ def render_combined_video(project, video_names, offsets):
     if cols * rows < len(videos):
         rows += 1
     print("video grid:", cols, "x", rows)
-    cell_w = int(output_w / cols)
-    cell_h = int(output_h / rows)
+    grid_w = int(output_w / cols)
+    grid_h = int(output_h / rows)
+    cell_w = (output_w - border*(cols+1)) / cols
+    cell_h = (output_h - border*(rows+1)) / rows
     cell_aspect = cell_w / cell_h
+    print("  grid size:", grid_w, "x", grid_h)
     print("  cell size:", cell_w, "x", cell_h, "aspect:", cell_aspect)
     
     # open writer for output
@@ -177,14 +181,14 @@ def render_combined_video(project, video_names, offsets):
                                                  interpolation=cv2.INTER_AREA)
                         (tmp_h, tmp_w) = frame_scale.shape[:2]
                         cut = int((tmp_w - cell_w) * 0.5)
-                        frame_scale = frame_scale[:,cut:cut+cell_w]
+                        frame_scale = frame_scale[:,cut:cut+int(round(cell_w))]
                     else:
                         frame_scale = cv2.resize(frame, (0,0), fx=scale_w,
                                                  fy=scale_w,
                                                  interpolation=cv2.INTER_AREA)
                         (tmp_h, tmp_w) = frame_scale.shape[:2]
                         cut = int((tmp_h - cell_h) * 0.5)
-                        frame_scale = frame_scale[cut:cut+cell_h,:]
+                        frame_scale = frame_scale[cut:cut+int(round(cell_h)),:]
                     frames[i] = frame_scale
                 # cv2.imshow(video_names[i], frame_scale)
             else:
@@ -198,8 +202,8 @@ def render_combined_video(project, video_names, offsets):
             col = 0
             for i, f in enumerate(frames):
                 if not f is None:
-                    x = col * cell_w
-                    y = row * cell_h
+                    x = int(round(border + col * (cell_w + border)))
+                    y = int(round(border + row * (cell_h + border)))
                     main_frame[y:y+f.shape[0],x:x+f.shape[1]] = f
                 col += 1
                 if col >= cols:
