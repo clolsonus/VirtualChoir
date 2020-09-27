@@ -123,5 +123,7 @@ I'm sure you have many.  Please feel free to ask for help!  As I write
 this, these software tools are very young and not tested across a wide
 set of performances.  I am new to this technology too, and learning as
 I go.  So let's learn together; help me make these tools work easier
-and better; and if your performances can bring a smile to someone's
-face, then it's all worth while!
+and better.
+
+If your performances can bring a smile to someone's face, then it's
+all worth while!
