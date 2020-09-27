@@ -79,6 +79,9 @@ clips (randomly) a tiny bit forward/back in time relative to each
 other to give a more natural feel (not too perfect) to the group
 performance.
 
+These tools can properly handle a wide variety audio formats, sampling
+rates, mono, stereo, and mix them all together correctly.
+
 ## Mixing video
 
 Video tracks are optional and can be recorded at the same time as the
@@ -95,6 +98,10 @@ Hopefully this is an acceptable trade off for people starting to learn
 the process and navigate through the technology maze!  The more you
 learn and the deeper you dive, the more of your own creativity you can
 bring to the final result.
+
+These tools can handle a wide variety of video formats, frames per
+second, aspect ratios, etc. and still grid and draw them all out
+properly in sync.
 
 ![chroma sync](images/chroma.png?raw=true "Chroma Representation")
 
