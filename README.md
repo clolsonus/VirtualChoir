@@ -134,3 +134,14 @@ and better.
 
 If your performances can bring a smile to someone's face, then it's
 all worth while!
+
+# Resources:
+
+## Other software, tools, and ideas for creating virutal works:
+
+  https://docs.google.com/document/d/1QK-PVHsBMGDT5RCx258rMFw1Aww4yGV8YkmHjXPrrsc/edit?usp=sharing
+
+## Sample recording instructions:
+
+   https://docs.google.com/document/d/1mWFmZ76PZErq-XEIeCNmw1FZdtWXVHjOARTSdNITCzA/edit?usp=sharing
+
