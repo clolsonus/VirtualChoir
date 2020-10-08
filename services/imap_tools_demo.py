@@ -3,14 +3,15 @@
 import datetime
 #import email
 from imap_tools import MailBox, AND
-#import json
-#import os
 import time
+import urllib.request
 
-import config
+import common
 
-settings = config.get_config()
+settings = common.get_config()
 
+def fetch_csv_response():
+    
 # watch the inbox for form submissions (or edits)
 # imap host, username & password are stored externally as a json file.
 print("imap host:", settings["host"])

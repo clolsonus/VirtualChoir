@@ -1,48 +1,17 @@
 #!/usr/bin/env python3
 
 import argparse
-import io
 import json
 import lxml.etree as ET
 import os
-import urllib.request
+
+import common
 
 parser = argparse.ArgumentParser(description='google folder list')
 parser.add_argument('url', help='google drive folder ulr')
 args = parser.parse_args()
 
-# fetch a url with progress
-def urlread(url):
-    with urllib.request.urlopen(url) as response:
-        if False:
-            html = response.read()
-        else:
-            length = response.getheader('content-length')
-            if length:
-                length = int(length)
-                blocksize = max(4096, length//100)
-            else:
-                blocksize = 1000000 # just made something up
-
-            print(length, blocksize)
-
-            buf = io.BytesIO()
-            size = 0
-            while True:
-                buf1 = response.read(blocksize)
-                if not buf1:
-                    break
-                buf.write(buf1)
-                size += len(buf1)
-                if length:
-                    print('{:.2f}\r done'.format(size/length), end='')
-            print()
-            html = buf.getvalue()
-    return html
-
-
-with urllib.request.urlopen(args.url) as response:
-   html = response.read()
+html = common.urlread(args.url, progress=False)
 #print("RAW HTML:", html)
 
 parsed_html = ET.HTML(html)
@@ -98,9 +67,7 @@ for i, entry in enumerate(dir_list):
                 continue
         print("Downloading:", url)
         print("Saving as:", entry[2])
-        #with urllib.request.urlopen(url) as response:
-        #    html = response.read()
-        html = urlread(url)
+        html = common.urlread(url)
         with open(entry[2], 'wb') as f:
             f.write(html)
             f.close()
