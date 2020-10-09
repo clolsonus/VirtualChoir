@@ -6,13 +6,13 @@ import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from pydub import AudioSegment, playback  # pip install pydub
+from pydub import AudioSegment, playback, scipy_effects  # pip install pydub
 import pyrubberband as pyrb               # pip install pyrubberband
 from scipy import signal                  # spectrogram
 
-import analyze
-import mixer
-import video
+from lib import analyze
+from lib import mixer
+from lib import video
 
 parser = argparse.ArgumentParser(description='virtual choir')
 parser.add_argument('project', help='project folder')
@@ -36,7 +36,7 @@ def change_audioseg_tempo(segment, scale):
     return new_seg
 
 # find all the project clips (needs work?)
-audio_extensions = [ "aiff", "m4a", "mp3", "wav" ]
+audio_extensions = [ "aac", "aiff", "m4a", "mp3", "wav" ]
 video_extensions = [ "avi", "mov", "mp4" ]
 audio_clips = []
 video_clips = []
@@ -68,7 +68,8 @@ for clip in audio_clips:
     sample = sample.normalize()
     audio_samples.append(sample)
     mono = sample.set_channels(1) # convert to mono
-    raw = mono.get_array_of_samples()
+    mono_filt = scipy_effects.band_pass_filter(mono, 130, 523) #C3-C5
+    raw = mono_filt.get_array_of_samples()
     audio_raws.append(raw)
 
 # load audio samples, normalize, then generate a mono version for analysis
@@ -81,7 +82,6 @@ for clip in video_clips:
     sample = AudioSegment.from_file(path, ext[1:])
     print(" ", clip, "rate:", sample.frame_rate, "channels:", sample.channels)
     sample = sample.set_frame_rate(48000)
-    from pydub import scipy_effects
     #sample = scipy_effects.band_pass_filter(sample, 130, 523) #C3-C5
     sample = scipy_effects.band_pass_filter(sample, 200, 500) # ~G3 - ~B4
     sample = sample.normalize()
@@ -200,12 +200,12 @@ if args.beat_sync:
 else:
     # use beat correlation to align clips
     print("correlating audio samples")
-    audio_group.correlate_by_beats( audio_group.onset_list[0],
-                                    audio_group.time_list[0],
-                                    plot=False)
-    #audio_group.correlate_by_intensity( audio_group.intensity_list[0],
-    #                                    audio_group.time_list[0],
-    #                                    plot=True)
+    #audio_group.correlate_by_beats( audio_group.onset_list[0],
+    #                                audio_group.time_list[0],
+    #                                plot=True)
+    audio_group.correlate_by_intensity( audio_group.intensity_list[0],
+                                        audio_group.time_list[0],
+                                        plot=True)
     for i in range(len(audio_group.offset_list)):
         sync_offsets.append( -audio_group.offset_list[i] * 1000) # ms units
 
