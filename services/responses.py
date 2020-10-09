@@ -4,7 +4,7 @@ import json
 import os
 import time
 
-import common
+from . import common
 
 def fetch( response_url ):
     csv_data = common.urlread(response_url)
