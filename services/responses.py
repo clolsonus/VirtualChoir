@@ -5,6 +5,7 @@ import os
 import time
 
 from . import common
+from . import gdrive
 
 def fetch( response_url ):
     csv_data = common.urlread(response_url)
@@ -33,9 +34,14 @@ def process():
                 dirty = True
                 if ts > new_time:
                     new_time = ts
-                #run_job(row)
+                run_job(row)
     if dirty:
         save_last_time(new_time)        
+
+def run_job(request):
+    # extract google folder id
+    url = request['Public google drive folder share link:']
+    gdrive.sync_folder(url)
 
 # read the saved time
 def get_last_time():
