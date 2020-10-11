@@ -40,7 +40,7 @@ def process():
 
 def run_job(request):
     # extract google folder id
-    url = request['Public google drive folder share link:']
+    url = request['Public google drive folder share link']
     gdrive.sync_folder(url)
 
 # read the saved time
