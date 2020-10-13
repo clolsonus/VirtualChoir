@@ -4,6 +4,7 @@ import math
 import numpy as np
 import os
 import skvideo.io               # pip install sk-video
+from tqdm import tqdm
 
 class VideoTrack:
     def __init__(self):
@@ -22,7 +23,8 @@ class VideoTrack:
         codec = metadata['video']['@codec_long_name']
         self.w = int(metadata['video']['@width'])
         self.h = int(metadata['video']['@height'])
-        self.total_frames = int(round(float(metadata['video']['@duration']) * self.fps))
+        self.duration = float(metadata['video']['@duration'])
+        self.total_frames = int(round(self.duration * self.fps))
         self.frame_counter = -1
         self.frame = []
 
@@ -103,13 +105,16 @@ def render_combined_video(project, video_names, offsets):
     
     # open all video clips and advance to clap sync point
     videos = []
+    max_duration = 0
     for i, file in enumerate(video_names):
         v = VideoTrack()
         path = os.path.join(project, file)
         if v.open(path):
-            #v.skip_secs(offsets[i] / 1000)
             videos.append(v)
-
+            if v.duration + offsets[i] > max_duration:
+                max_duration = v.duration + offsets[i]
+    print("group video duration:", max_duration)
+    
     if len(videos) == 0:
         return
 
@@ -151,11 +156,11 @@ def render_combined_video(project, video_names, offsets):
     done = False
     frames = [None] * len(videos)
     output_time = 0
+    pbar = tqdm(total=int(max_duration*output_fps), smoothing=0.05)
     while not done:
         done = True
         for i, v in enumerate(videos):
-            offset_sec = offsets[i] / 1000
-            frame = v.get_frame(output_time + offset_sec)
+            frame = v.get_frame(output_time - offsets[i])
             if not frame is None:
                 done = False
                 (h, w) = frame.shape[:2]
@@ -213,6 +218,8 @@ def render_combined_video(project, video_names, offsets):
             cv2.waitKey(1)
             writer.writeFrame(main_frame[:,:,::-1])  #write the frame as RGB not BGR
             output_time += 1 / output_fps
+            pbar.update(1)
+    pbar.close()
     writer.close()
 
 def merge(project):
@@ -221,5 +228,5 @@ def merge(project):
     input_video = os.path.join(project, "group.mp4")
     input_audio = os.path.join(project, "group.wav")
     output_video = os.path.join(project, "final.mp4")
-    result = call(["ffmpeg", "-i", input_video, "-i", input_audio, "-c:v", "copy", "-c:a", "aac", output_video])
+    result = call(["ffmpeg", "-i", input_video, "-i", input_audio, "-c:v", "copy", "-c:a", "aac", "-y", output_video])
     print("ffmpeg result code:", result)
