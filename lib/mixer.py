@@ -11,7 +11,8 @@ def combine(names, samples, sync_offsets, pan_range=0, sync_jitter_ms=0):
             sync_offset = sync_offsets[i]
         print(" ", names[i], sync_offset)
         sample = sample.set_channels(2)
-        sample = sample.pan( random.uniform(-0.75, 0.75) )
+        if pan_range > 0.00001 and pan_range <= 1.0:
+            sample = sample.pan( random.uniform(-pan_range, pan_range) )
         sample = sample.fade_in(1000)
         sample = sample.fade_out(1000)
         sr = sample.frame_rate
@@ -37,5 +38,6 @@ def combine(names, samples, sync_offsets, pan_range=0, sync_jitter_ms=0):
     y_mixed /= len(samples)
     y_mixed = np.int16(y_mixed)
     mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
+    mixed.normalize()
     return mixed
     
