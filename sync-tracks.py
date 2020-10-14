@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import csv
 import librosa                  # pip install librosa
 import librosa.display
 import matplotlib.pyplot as plt
@@ -19,7 +20,7 @@ parser.add_argument('project', help='project folder')
 args = parser.parse_args()
 
 # find all the project clips
-audio_extensions = [ "aac", "aiff", "m4a", "mp3", "wav" ]
+audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "wav" ]
 video_extensions = [ "avi", "mov", "mp4" ]
 audacity_extension = "aup"
 ignore_extensions = [ "lof" ]
@@ -49,24 +50,50 @@ print("video tracks:", video_tracks)
 if aup_project:
     print("audacity project for sync:", aup_project)
 
-# temp here
-offsets = aup.offsets_from_aup(audio_tracks, args.project, aup_project)
-
+hints_file = os.path.join(args.project, "hints.txt")
+gain_hints = {}
+rotate_hints = {}
+if os.path.exists(hints_file):
+    print("Found a hints.txt file, loading...")
+    with open(hints_file, 'r') as fp:
+        reader = csv.reader(fp, delimiter=' ', skipinitialspace=True)
+        for row in reader:
+            print("|".join(row))
+            if len(row) < 2:
+                print("bad hint.txt syntax:", row)
+                continue
+            name = row[0]
+            hint = row[1]
+            if hint == "gain":
+                if len(row) == 3:
+                    gain_hints[name] = float(row[2])
+                else:
+                    print("bad hint.txt syntax:", row)
+            if hint == "rotate":
+                if len(row) == 3:
+                    rotate_hints[name] = int(row[2])
+                else:
+                    print("bad hint.txt syntax:", row)
+        
 # load audio tracks and normalize
 print("loading audio tracks...")
 audio_samples = []
 max_frame_rate = 0
 for track in tqdm(audio_tracks):
+    #print("loading:", track)
     basename, ext = os.path.splitext(track)
     path = os.path.join(args.project, track)
+    if ext == ".aif":
+        ext = ".aiff"
     sample = AudioSegment.from_file(path, ext[1:])
+    sample = sample.set_sample_width(2) # force to 2 for this project
     sample = sample.normalize()
     if sample.frame_rate > max_frame_rate:
         max_frame_rate = sample.frame_rate
     audio_samples.append(sample)
     
 for i, sample in enumerate(audio_samples):
-    print(" ", audio_tracks[i], "rate:", sample.frame_rate, "channels:", sample.channels)
+    print(" ", audio_tracks[i], "rate:", sample.frame_rate, "channels:", sample.channels, "width:", sample.sample_width)
 
 print("max frame rate:", max_frame_rate)
 for i, sample in enumerate(audio_samples):
@@ -107,10 +134,9 @@ else:
     # we found an audacity project, let's read the sync offsets from that
     sync_offsets = aup.offsets_from_aup(audio_tracks, args.project, aup_project)
 
-        
 print("Mixing samples...")
 mixed = mixer.combine(audio_tracks, audio_samples, sync_offsets,
-                      pan_range=0.25)
+                      gain_hints=gain_hints, pan_range=0.25)
 group_file = os.path.join(args.project, "group.wav")
 mixed.export(group_file, format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 #playback.play(mixed)
@@ -119,13 +145,14 @@ if len(video_tracks):
     video_offsets = []
     for track in video_tracks:
         ai = audio_tracks.index(track)
-        print(track, ai)
-        video_offsets.append( audio_group.offset_list[ai] )
+        print(track, ai, -sync_offsets[ai] / 1000)
+        video_offsets.append( -sync_offsets[ai] / 1000 )
     #for i in range(len(video_group.offset_list)):
     #    video_offsets.append( -video_group.offset_list[i] * 1000) # ms units
         
     # render the new combined video
-    video.render_combined_video( args.project, video_tracks, video_offsets )
+    video.render_combined_video( args.project, video_tracks, video_offsets,
+                                 rotate_hints=rotate_hints)
     video.merge( args.project )
 
 if False:
