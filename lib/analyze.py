@@ -247,7 +247,8 @@ class SampleGroup():
             self.offset_list.append(median)
         print(self.offset_list)
         if offset_shift is None:
-            self.shift = np.max(self.offset_list)
+            #self.shift = np.max(self.offset_list)
+            self.shift = 0.0
         else:
             self.shift = offset_shift
         self.max_index = np.argmax(self.offset_list)
