@@ -15,7 +15,7 @@ def offsets_from_aup(audio_tracks, dir, file):
         offset = float(wc.attrib["offset"])
         print(basename, offset)
         for i, name in enumerate(audio_tracks):
-            if name.startswith(basename):
+            if name.startswith(basename + "."):
                 sync_offsets[i] = -offset * 1000 # ms
     print(sync_offsets)
     return sync_offsets
