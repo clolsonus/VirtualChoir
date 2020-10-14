@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from pydub import AudioSegment, playback  # pip install pydub
 import random
@@ -17,8 +18,12 @@ def combine(names, samples, sync_offsets, pan_range=0, sync_jitter_ms=0):
         sample = sample.fade_out(1000)
         sr = sample.frame_rate
         sync_ms = sync_offset
-        #sync_ms = sync_offset + random.randrange(-20, 20)
-        y = np.array(sample[sync_ms:].get_array_of_samples()).astype('float')
+        if sync_ms >= 0:
+            synced_sample = sample[sync_ms:]
+        else:
+            pad = AudioSegment.silent(duration=-sync_ms)
+            synced_sample = pad + sample        
+        y = np.array(synced_sample.get_array_of_samples()).astype('float')
         #if sample.channels == 2:
         #    y = y.reshape((-1, 2))
         #print(" ", y.shape)
@@ -35,7 +40,8 @@ def combine(names, samples, sync_offsets, pan_range=0, sync_jitter_ms=0):
                 #print("extending sample by:", diff)
                 y = np.concatenate([y, np.zeros(diff)], axis=None)
             y_mixed += y
-    y_mixed /= len(samples)
+    #y_mixed *= (1 / len(samples)) # very conservative output levels
+    y_mixed *= (1 / math.sqrt(len(samples))) # balsy but good chance of working
     y_mixed = np.int16(y_mixed)
     mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
     mixed.normalize()
