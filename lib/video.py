@@ -96,7 +96,7 @@ class VideoTrack:
 # fixme: deal with beat sync (maybe?)
 # fixme: better size & arrangement scheme
 # fixme: borders around frames?
-def render_combined_video(project, video_names, offsets):
+def render_combined_video(project, video_names, offsets, rotate_hints={}):
     # 1080p
     output_w = 1920
     output_h = 1080
@@ -156,13 +156,18 @@ def render_combined_video(project, video_names, offsets):
     done = False
     frames = [None] * len(videos)
     output_time = 0
-    pbar = tqdm(total=int(max_duration*output_fps), smoothing=0.05)
+    pbar = tqdm(total=int(max_duration*output_fps), smoothing=0.1)
     while not done:
         done = True
         for i, v in enumerate(videos):
             frame = v.get_frame(output_time - offsets[i])
             if not frame is None:
                 done = False
+                if video_names[i] in rotate_hints:
+                    if rotate_hints[video_names[i]] == 180:
+                        frame = cv2.flip(frame, -1)
+                    else:
+                        print("unhandled rotation angle:", rotate_hints[video_names[i]])
                 (h, w) = frame.shape[:2]
                 aspect = w/h
                 scale_w = cell_w / w
