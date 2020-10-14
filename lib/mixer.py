@@ -3,9 +3,16 @@ import numpy as np
 from pydub import AudioSegment, playback  # pip install pydub
 import random
 
-def combine(names, samples, sync_offsets, pan_range=0, sync_jitter_ms=0):
+def combine(names, samples, sync_offsets, gain_hints={},
+            pan_range=0, sync_jitter_ms=0):
     y_mixed = None
+    mixed_count = 0
     for i, sample in enumerate(samples):
+        if names[i] in gain_hints:
+            track_gain = gain_hints[names[i]]
+        else:
+            track_gain = 1.0
+        mixed_count += track_gain
         if sync_offsets is None:
             sync_offset = 0
         else:
@@ -39,9 +46,9 @@ def combine(names, samples, sync_offsets, pan_range=0, sync_jitter_ms=0):
                 diff = y_mixed.shape[0] - y.shape[0]
                 #print("extending sample by:", diff)
                 y = np.concatenate([y, np.zeros(diff)], axis=None)
-            y_mixed += y
-    #y_mixed *= (1 / len(samples)) # very conservative output levels
-    y_mixed *= (1 / math.sqrt(len(samples))) # balsy but good chance of working
+            y_mixed += (y * track_gain)
+    #y_mixed *= (1 / len(mixed_count)) # very conservative output levels
+    y_mixed *= (1 / math.sqrt(mixed_count)) # balsy but good chance of working
     y_mixed = np.int16(y_mixed)
     mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
     mixed.normalize()
