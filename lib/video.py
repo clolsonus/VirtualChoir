@@ -231,7 +231,7 @@ def merge(project):
     # use ffmpeg to combine the video and audio tracks into the final movie
     from subprocess import call
     input_video = os.path.join(project, "group.mp4")
-    input_audio = os.path.join(project, "group.wav")
+    input_audio = os.path.join(project, "group.mp3")
     output_video = os.path.join(project, "final.mp4")
     result = call(["ffmpeg", "-i", input_video, "-i", input_audio, "-c:v", "copy", "-c:a", "aac", "-y", output_video])
     print("ffmpeg result code:", result)
