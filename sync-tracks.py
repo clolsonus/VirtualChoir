@@ -137,9 +137,13 @@ else:
 print("Mixing samples...")
 mixed = mixer.combine(audio_tracks, audio_samples, sync_offsets,
                       gain_hints=gain_hints, pan_range=0.25)
-group_file = os.path.join(args.project, "group.wav")
-mixed.export(group_file, format="wav", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
+group_file = os.path.join(args.project, "group.mp3")
+mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 #playback.play(mixed)
+
+if True:
+    # write trimmed/padded samples for 'easy' alignment
+    mixer.save_aligned(args.project, audio_tracks, audio_samples, sync_offsets)
 
 if len(video_tracks):
     video_offsets = []
