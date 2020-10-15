@@ -1,10 +1,10 @@
 import math
 import numpy as np
+import os
 from pydub import AudioSegment, playback  # pip install pydub
 import random
 
-def combine(names, samples, sync_offsets, gain_hints={},
-            pan_range=0, sync_jitter_ms=0):
+def combine(names, samples, sync_offsets, gain_hints={}, pan_range=0):
     y_mixed = None
     mixed_count = 0
     for i, sample in enumerate(samples):
@@ -17,7 +17,7 @@ def combine(names, samples, sync_offsets, gain_hints={},
             sync_offset = 0
         else:
             sync_offset = sync_offsets[i]
-        print(" ", names[i], sync_offset)
+        print(" ", names[i], "offset(ms):", sync_offset, "gain:", track_gain)
         sample = sample.set_channels(2)
         if pan_range > 0.00001 and pan_range <= 1.0:
             sample = sample.pan( random.uniform(-pan_range, pan_range) )
@@ -30,7 +30,7 @@ def combine(names, samples, sync_offsets, gain_hints={},
         else:
             pad = AudioSegment.silent(duration=-sync_ms)
             synced_sample = pad + sample        
-        y = np.array(synced_sample.get_array_of_samples()).astype('float')
+        y = np.array(synced_sample.get_array_of_samples()).astype('double')
         #if sample.channels == 2:
         #    y = y.reshape((-1, 2))
         #print(" ", y.shape)
@@ -48,9 +48,30 @@ def combine(names, samples, sync_offsets, gain_hints={},
                 y = np.concatenate([y, np.zeros(diff)], axis=None)
             y_mixed += (y * track_gain)
     #y_mixed *= (1 / len(mixed_count)) # very conservative output levels
-    y_mixed *= (1 / math.sqrt(mixed_count)) # balsy but good chance of working
+    #y_mixed *= (1 / math.sqrt(mixed_count)) # balsy but good chance of working
+    y_mixed *= (1 / math.pow(mixed_count, 0.6)) # slightly more conservative
     y_mixed = np.int16(y_mixed)
     mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
     mixed.normalize()
     return mixed
+    
+def save_aligned(project, names, samples, sync_offsets):
+    print("Writing aligned version of samples (padded/trimed)...")
+    for i, sample in enumerate(samples):
+        if sync_offsets is None:
+            sync_offset = 0
+        else:
+            sync_offset = sync_offsets[i]
+        sample = sample.set_channels(2)
+        sr = sample.frame_rate
+        sync_ms = sync_offset
+        if sync_ms >= 0:
+            synced_sample = sample[sync_ms:]
+        else:
+            pad = AudioSegment.silent(duration=-sync_ms)
+            synced_sample = pad + sample        
+        basename, ext = os.path.splitext(names[i])
+        output_file = os.path.join(project, "aligned_" + basename + ".mp3")
+        print(" ", output_file, "offset(ms):", sync_offset)
+        synced_sample.export(output_file, format="mp3")
     
