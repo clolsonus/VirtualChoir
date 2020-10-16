@@ -54,23 +54,6 @@ class VideoTrack:
                 self.frame = None
         return self.frame
         
-    def get_frame_interp(self, time):
-        # return an interpolated frame at 'time'.  Because the video
-        # streams are sequential, never ask for a time earlier than
-        # the previous request!
-        frame_num = int(round(time * self.fps))
-        print("request frame num:", frame_num)
-        while self.frame_counter < frame_num and not self.frame is None:
-            try:
-                self.frame = self.reader._readFrame()
-                self.frame = self.frame[:,:,::-1]
-                self.frame_counter += 1
-                if not len(self.frame):
-                    self.frame = None
-            except:
-                self.frame = None
-        return self.frame
-        
     def skip_secs(self, seconds):
         if not self.reader:
             return
@@ -92,10 +75,9 @@ class VideoTrack:
 #
 # work on generating video early for testing purposes
 #
-# fixme: deal with different input fps
-# fixme: deal with beat sync (maybe?)
-# fixme: better size & arrangement scheme
-# fixme: borders around frames?
+# fixme: need to consider portrait video aspect ratios
+# fixme: figure out why zooming on some landscape videos in some cases
+#        doesn't always fill the grid cell (see Coeur, individual grades.) 
 def render_combined_video(project, video_names, offsets, rotate_hints={}):
     # 1080p
     output_w = 1920
@@ -163,9 +145,17 @@ def render_combined_video(project, video_names, offsets, rotate_hints={}):
             frame = v.get_frame(output_time - offsets[i])
             if not frame is None:
                 done = False
-                if video_names[i] in rotate_hints:
-                    if rotate_hints[video_names[i]] == 180:
+                basevid = os.path.basename(video_names[i])
+                #print("basevid:", basevid)
+                if basevid in rotate_hints:
+                    if rotate_hints[basevid] == 90:
+                        frame = cv2.transpose(frame)
+                        frame = cv2.flip(frame, 1)
+                    elif rotate_hints[basevid] == 180:
                         frame = cv2.flip(frame, -1)
+                    elif rotate_hints[basevid] == 270:
+                        frame = cv2.transpose(frame)
+                        frame = cv2.flip(frame, 0)
                     else:
                         print("unhandled rotation angle:", rotate_hints[video_names[i]])
                 (h, w) = frame.shape[:2]
