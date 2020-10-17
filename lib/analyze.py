@@ -194,6 +194,39 @@ class SampleGroup():
         for i in range(len(self.offset_list)):
             self.offset_list[i] -= self.shift
 
+    def pretty_print_offset_array(self, offsets):
+        print(offsets.shape)
+        print("offsets: ", end='')
+        for i in range(offsets.shape[0]):
+            print("%.3f " % offsets[i], end='')
+        print()
+            
+    def mutual_offset_solver(self, offset_matrix):
+        self.offset_list = []
+        done = False
+        count = 0
+        offsets = offset_matrix[0,:]
+        self.pretty_print_offset_array(offsets)
+        while not done:
+            done = True
+            count += 1
+            offsets_ss = np.copy(offsets)
+            for i in range(offsets.shape[0]):
+                diff_array = offsets_ss - offset_matrix[i,:]
+                median = np.median(diff_array)
+                print(diff_array)
+                print(median, np.mean(diff_array), np.std(diff_array))
+                offsets[i] = median
+            print("count:", count)
+            self.pretty_print_offset_array(offsets)
+            # decide if we need to do another iteration
+            for i in range(offsets.shape[0]):
+                if abs(offsets[i] - offsets_ss[i]) > 0.0005:
+                    done = False
+        # slide the solution by the median offset to keep it centered
+        offsets -= np.median(offsets)
+        return offsets                
+ 
     def correlate_by_generic(self, metric_list, offset_shift=None, plot=False):
         # compute relative time offsets by best correlation
         num = len(metric_list)
@@ -237,14 +270,18 @@ class SampleGroup():
                     plt.legend()
                     plt.show()
         print("offset_matrix:\n", offset_matrix)
-        self.offset_list = []
-        for i in range(num):
-            diff_array = offset_matrix[0,:] - offset_matrix[i,:]
-            median = np.median(diff_array)
-            print(offset_matrix[i,:])
-            print(diff_array)
-            print(median, np.mean(diff_array), np.std(diff_array))
-            self.offset_list.append(median)
+
+        self.offset_list = self.mutual_offset_solver(offset_matrix).tolist()
+
+        if False:
+            self.offset_list = []
+            for i in range(num):
+                diff_array = offset_matrix[0,:] - offset_matrix[i,:]
+                median = np.median(diff_array)
+                print(offset_matrix[i,:])
+                print(diff_array)
+                print(median, np.mean(diff_array), np.std(diff_array))
+                self.offset_list.append(median)
         print(self.offset_list)
         if offset_shift is None:
             #self.shift = np.max(self.offset_list)
