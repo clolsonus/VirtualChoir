@@ -17,36 +17,52 @@ from lib import video
 
 parser = argparse.ArgumentParser(description='virtual choir')
 parser.add_argument('project', help='project folder')
+parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
+parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
+
 args = parser.parse_args()
 
-# find all the project clips
+# find all the project clips (todo: recurse)
 audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "wav" ]
 video_extensions = [ "avi", "mov", "mp4" ]
 audacity_extension = "aup"
-ignore_extensions = [ "lof" ]
+ignore_extensions = [ "au", "lof", "txt", "zip" ]
 audio_tracks = []
 video_tracks = []
 aup_project = None
-for file in sorted(os.listdir(args.project)):
-    basename, ext = os.path.splitext(file)
-    if basename == "group" or basename == "final":
-        continue
-    if not len(ext) or ext[1:].lower() in ignore_extensions:
-        continue
-    if ext[1:].lower() in audio_extensions + video_extensions:
-        audio_tracks.append(file)
-        if ext[1:].lower() in video_extensions:
-            video_tracks.append(file)
-    elif ext[1:].lower() == audacity_extension:
-        if aup_project == None:
-            aup_project = file    
+
+def scan_directory(path, pretty_path=""):
+    global aup_project
+    for file in sorted(os.listdir(path)):
+        fullname = os.path.join(path, file)
+        pretty_name = os.path.join(pretty_path, file)
+        # print(pretty_name)
+        if os.path.isdir(fullname):
+            scan_directory(fullname, os.path.join(pretty_path, file))
         else:
-            print("WARNING! More than one audacity project file (.aup) found")
-            print("Using first one found:", aup_project)
-    else:
-        print("Unknown extenstion (skipping):", file)
+            basename, ext = os.path.splitext(file)
+            if basename == "group" or basename == "final":
+                continue
+            if not len(ext) or ext[1:].lower() in ignore_extensions:
+                continue
+            if ext[1:].lower() in audio_extensions + video_extensions:
+                audio_tracks.append(pretty_name)
+                if ext[1:].lower() in video_extensions:
+                    video_tracks.append(pretty_name)
+            elif ext[1:].lower() == audacity_extension:
+                if aup_project == None and not pretty_path:
+                    aup_project = pretty_name
+                else:
+                    print("WARNING! More than one audacity project file (.aup) found")
+                    print("Using first one found:", aup_project)
+            else:
+                print("Unknown extenstion (skipping):", file)
+
+scan_directory(args.project)
+
 print("audio tracks:", audio_tracks)
 print("video tracks:", video_tracks)
+
 if aup_project:
     print("audacity project for sync:", aup_project)
 
@@ -69,11 +85,13 @@ if os.path.exists(hints_file):
                     gain_hints[name] = float(row[2])
                 else:
                     print("bad hint.txt syntax:", row)
-            if hint == "rotate":
+            elif hint == "rotate":
                 if len(row) == 3:
                     rotate_hints[name] = int(row[2])
                 else:
                     print("bad hint.txt syntax:", row)
+            else:
+                print("hint unknown (or typo):", row)
         
 # load audio tracks and normalize
 print("loading audio tracks...")
@@ -118,7 +136,7 @@ if not aup_project:
     audio_group.compute_basic(audio_samples, audio_raws)
     audio_group.compute_intensities(audio_raws)
     audio_group.compute_clarities(audio_samples, audio_raws)
-    audio_group.gen_plots(audio_samples, audio_raws, audio_tracks, sync_offsets=None)
+    # audio_group.gen_plots(audio_samples, audio_raws, audio_tracks, sync_offsets=None)
 
     print("correlating audio samples")
     #audio_group.correlate_by_beats( audio_group.onset_list[0],
@@ -132,18 +150,24 @@ if not aup_project:
         sync_offsets.append( -audio_group.offset_list[i] * 1000) # ms units
 else:
     # we found an audacity project, let's read the sync offsets from that
-    sync_offsets = aup.offsets_from_aup(audio_tracks, args.project, aup_project)
+    sync_offsets = aup.offsets_from_aup(audio_tracks, audio_samples,
+                                        args.project, aup_project)
 
 print("Mixing samples...")
-mixed = mixer.combine(audio_tracks, audio_samples, sync_offsets,
+if args.mute_videos:
+    mute_tracks = video_tracks
+else:
+    mute_tracks = []
+mixed = mixer.combine(audio_tracks, audio_samples, sync_offsets, mute_tracks,
                       gain_hints=gain_hints, pan_range=0.25)
 group_file = os.path.join(args.project, "group.mp3")
 mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 #playback.play(mixed)
 
-if True:
+if args.write_aligned_tracks:
     # write trimmed/padded samples for 'easy' alignment
-    mixer.save_aligned(args.project, audio_tracks, audio_samples, sync_offsets)
+    mixer.save_aligned(args.project, audio_tracks, audio_samples, sync_offsets,
+                       mute_tracks)
 
 if len(video_tracks):
     video_offsets = []
@@ -151,9 +175,6 @@ if len(video_tracks):
         ai = audio_tracks.index(track)
         print(track, ai, -sync_offsets[ai] / 1000)
         video_offsets.append( -sync_offsets[ai] / 1000 )
-    #for i in range(len(video_group.offset_list)):
-    #    video_offsets.append( -video_group.offset_list[i] * 1000) # ms units
-        
     # render the new combined video
     video.render_combined_video( args.project, video_tracks, video_offsets,
                                  rotate_hints=rotate_hints)
