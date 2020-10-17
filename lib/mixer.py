@@ -4,12 +4,16 @@ import os
 from pydub import AudioSegment, playback  # pip install pydub
 import random
 
-def combine(names, samples, sync_offsets, gain_hints={}, pan_range=0):
+def combine(names, samples, sync_offsets, mute_tracks,
+            gain_hints={}, pan_range=0):
     y_mixed = None
     mixed_count = 0
     for i, sample in enumerate(samples):
-        if names[i] in gain_hints:
-            track_gain = gain_hints[names[i]]
+        if names[i] in mute_tracks:
+            print("skipping muted:", names[i])
+            continue
+        if os.path.basename(names[i]) in gain_hints:
+            track_gain = gain_hints[os.path.basename(names[i])]
         else:
             track_gain = 1.0
         mixed_count += track_gain
@@ -55,9 +59,12 @@ def combine(names, samples, sync_offsets, gain_hints={}, pan_range=0):
     mixed.normalize()
     return mixed
     
-def save_aligned(project, names, samples, sync_offsets):
+def save_aligned(project, names, samples, sync_offsets, mute_tracks,):
     print("Writing aligned version of samples (padded/trimed)...")
     for i, sample in enumerate(samples):
+        if names[i] in mute_tracks:
+            print("skipping muted:", names[i])
+            continue
         if sync_offsets is None:
             sync_offset = 0
         else:
@@ -69,9 +76,10 @@ def save_aligned(project, names, samples, sync_offsets):
             synced_sample = sample[sync_ms:]
         else:
             pad = AudioSegment.silent(duration=-sync_ms)
-            synced_sample = pad + sample        
-        basename, ext = os.path.splitext(names[i])
-        output_file = os.path.join(project, "aligned_" + basename + ".mp3")
+            synced_sample = pad + sample
+        basename = os.path.basename(names[i])
+        name, ext = os.path.splitext(basename)
+        output_file = os.path.join(project, "aligned_" + name + ".wav")
         print(" ", output_file, "offset(ms):", sync_offset)
-        synced_sample.export(output_file, format="mp3")
+        synced_sample.export(output_file, format="wav")
     
