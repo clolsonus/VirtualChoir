@@ -1,8 +1,12 @@
 # Virtual Choir Syncing, Mixing, and Rendering Tools
 
 Virtual choirs allow people from across the world or just across town
-to collaborate and make music together.  This project seeks to make
-the process of creating virtual choir songs easier and quicker.
+to collaborate and make music together.  If you are an experienced
+creator, these tools can help your project come together more quickly.
+For those that are new, these tools can open the door to this
+fascinating world (without requiring audio or video editing experience
+or expensive software) so that you and your performers can show off
+your efforts and talents!
 
 ![demo choir](images/combined.png?raw=true "Combined Demo")
 
