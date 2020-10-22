@@ -292,6 +292,49 @@ class SampleGroup():
         for i in range(len(self.offset_list)):
             self.offset_list[i] -= self.shift
 
+    # sync by claps
+    def sync_by_claps(self):
+        # presumes onset envelopes and clarities have been computed
+
+        dt = self.time_list[0][1] - self.time_list[0][0]
+        print("dt:", dt)
+        
+        # find the start time of the the first clear note
+        first_note = [0] * len(self.clarity_list)
+        lead_list = []
+        for i in range(len(self.clarity_list)):
+            clarity = self.clarity_list[i]
+            accum = 0
+            for j in range(len(clarity)):
+                accum += clarity[j]
+                #print(self.time_list[i][j], accum)
+                if accum > 100000:
+                    first_note[i] = j
+                    lead_list.append(self.intensity_list[i][:j])
+                    break
+        print("first notes:", first_note)
+
+        # ramp in/out
+        n = int(0.5 / dt)
+        for ll in lead_list:
+            print(len(ll), n)
+            if len(ll) > 2*n:
+                for i in range(n):
+                    ll[i] *= i/n
+                    ll[-(i+1)] *= i/n
+            else:
+                # skip super short lead in, sorry this one will need to
+                # get fixed by hand probably
+                pass
+
+        # smooth (spread out peaks so better chance of overlapping
+        for i in range(len(lead_list)):
+            box_pts = int(0.2/dt)
+            box = np.ones(box_pts)/box_pts
+            lead_list[i] = np.convolve(lead_list[i], box, mode='same')
+            
+        self.correlate_by_generic(lead_list, plot=False)
+                
     # visualize audio streams (using librosa functions)
     def gen_plots(self, samples, raws, names, sync_offsets=None):
         print("Generating basic clip waveform...")
