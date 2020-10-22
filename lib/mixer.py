@@ -6,6 +6,13 @@ import random
 
 def combine(names, samples, sync_offsets, mute_tracks,
             gain_hints={}, pan_range=0):
+    durations_ms = []
+    for i, sample in enumerate(samples):
+        print(names[i], len(sample) / 1000, sync_offsets[i])
+        durations_ms.append( len(sample) - sync_offsets[i] )
+    duration_ms = np.median(durations_ms)
+    print("median audio duration (ms):", duration_ms)
+    
     y_mixed = None
     mixed_count = 0
     for i, sample in enumerate(samples):
@@ -26,14 +33,17 @@ def combine(names, samples, sync_offsets, mute_tracks,
         if pan_range > 0.00001 and pan_range <= 1.0:
             sample = sample.pan( random.uniform(-pan_range, pan_range) )
         sample = sample.fade_in(1000)
-        sample = sample.fade_out(1000)
         sr = sample.frame_rate
         sync_ms = sync_offset
         if sync_ms >= 0:
             synced_sample = sample[sync_ms:]
         else:
             pad = AudioSegment.silent(duration=-sync_ms)
-            synced_sample = pad + sample        
+            synced_sample = pad + sample
+        # trim end for length
+        synced_sample = synced_sample[:duration_ms]
+        synced_sample = synced_sample.fade_out(1000)
+        
         y = np.array(synced_sample.get_array_of_samples()).astype('double')
         #if sample.channels == 2:
         #    y = y.reshape((-1, 2))
@@ -51,9 +61,9 @@ def combine(names, samples, sync_offsets, mute_tracks,
                 #print("extending sample by:", diff)
                 y = np.concatenate([y, np.zeros(diff)], axis=None)
             y_mixed += (y * track_gain)
+    y_mixed *= (1 / math.sqrt(mixed_count)) # balsy but good chance of working
+    #y_mixed *= (1 / math.pow(mixed_count, 0.6)) # slightly more conservative
     #y_mixed *= (1 / len(mixed_count)) # very conservative output levels
-    #y_mixed *= (1 / math.sqrt(mixed_count)) # balsy but good chance of working
-    y_mixed *= (1 / math.pow(mixed_count, 0.6)) # slightly more conservative
     y_mixed = np.int16(y_mixed)
     mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
     mixed.normalize()
