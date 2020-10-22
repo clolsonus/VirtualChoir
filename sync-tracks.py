@@ -17,21 +17,28 @@ from lib import video
 
 parser = argparse.ArgumentParser(description='virtual choir')
 parser.add_argument('project', help='project folder')
+parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
+                    help='sync strategy')
 parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
-parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
+parser.add_argument('--write-aligned-audio', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
+parser.add_argument('--write-aligned-video', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
 
 args = parser.parse_args()
 
 # find all the project clips (todo: recurse)
-audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "wav" ]
+audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "ogg", "wav" ]
 video_extensions = [ "avi", "mov", "mp4" ]
 audacity_extension = "aup"
 ignore_extensions = [ "au", "lof", "txt", "zip" ]
 audio_tracks = []
 video_tracks = []
+title_page = None
+credits_page = None
 aup_project = None
 
 def scan_directory(path, pretty_path=""):
+    global title_page
+    global credits_page
     global aup_project
     for file in sorted(os.listdir(path)):
         fullname = os.path.join(path, file)
@@ -53,13 +60,24 @@ def scan_directory(path, pretty_path=""):
                 if aup_project == None and not pretty_path:
                     aup_project = pretty_name
                 else:
-                    print("WARNING! More than one audacity project file (.aup) found")
-                    print("Using first one found:", aup_project)
+                    if aup_project != None:
+                        print("WARNING! More than one audacity project file (.aup) found")
+                        print("Using first one found:", aup_project)
+                    else:
+                        print("WARNING! Ignoring .aup file found in subdirectory:", aup_project)
+            elif basename.lower() == "title":
+                title_page = pretty_name
+            elif basename.lower() == "credits":
+                credits_page = pretty_name
             else:
                 print("Unknown extenstion (skipping):", file)
 
 scan_directory(args.project)
 
+if title_page:
+    print("title page:", title_page)
+if credits_page:
+    print("credits page:", credits_page)
 print("audio tracks:", audio_tracks)
 print("video tracks:", video_tracks)
 
@@ -136,13 +154,18 @@ if not aup_project:
     audio_group.compute_basic(audio_samples, audio_raws)
     audio_group.compute_intensities(audio_raws)
     audio_group.compute_clarities(audio_samples, audio_raws)
-    # audio_group.gen_plots(audio_samples, audio_raws, audio_tracks, sync_offsets=None)
+    #audio_group.gen_plots(audio_samples, audio_raws, audio_tracks, sync_offsets=None)
 
     print("correlating audio samples")
-    #audio_group.correlate_by_beats( audio_group.onset_list[0],
-    #                                audio_group.time_list[0],
-    #                                plot=True)
-    audio_group.correlate_by_generic(audio_group.clarity_list, plot=False)
+    if args.sync == "clarity":
+        audio_group.correlate_by_generic(audio_group.clarity_list, plot=False)
+    elif args.sync == "clap":
+        audio_group.sync_by_claps()
+    #else:
+    #  audio_group.correlate_by_beats( audio_group.onset_list[0],
+    #                                  audio_group.time_list[0],
+    #                                  plot=True)
+    
     with open(os.path.join(args.project, "audacity_import.lof"), 'w') as fp:
         for i in range(len(audio_group.offset_list)):
             fp.write('file "%s" offset %.3f\n' % (audio_tracks[i], audio_group.offset_list[i]))
@@ -164,7 +187,7 @@ group_file = os.path.join(args.project, "group.mp3")
 mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 #playback.play(mixed)
 
-if args.write_aligned_tracks:
+if args.write_aligned_audio:
     # write trimmed/padded samples for 'easy' alignment
     mixer.save_aligned(args.project, audio_tracks, audio_samples, sync_offsets,
                        mute_tracks)
@@ -177,7 +200,9 @@ if len(video_tracks):
         video_offsets.append( -sync_offsets[ai] / 1000 )
     # render the new combined video
     video.render_combined_video( args.project, video_tracks, video_offsets,
-                                 rotate_hints=rotate_hints)
+                                 rotate_hints=rotate_hints,
+                                 title_page=title_page,
+                                 credits_page=credits_page )
     video.merge( args.project )
 
 if False:
