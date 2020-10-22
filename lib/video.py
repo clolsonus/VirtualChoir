@@ -35,6 +35,7 @@ class VideoTrack:
 
         print("Opening ", file)
         self.reader = skvideo.io.FFmpegReader(file, inputdict={}, outputdict={})
+        self.get_frame(0.0)     # read first frame
         return True
 
     def get_frame(self, time):
@@ -42,7 +43,12 @@ class VideoTrack:
         frame_num = int(round(time * self.fps))
         # print("request frame num:", frame_num)
         if frame_num < 0:
-            return np.zeros(shape=[self.h, self.w, 3], dtype=np.uint8)
+            if self.frame is None:
+                return np.zeros(shape=[self.h, self.w, 3], dtype=np.uint8)
+            else:
+                (h, w) = self.frame.shape[:2]
+                return np.zeros(shape=[h, w, 3],
+                                dtype=np.uint8)
         while self.frame_counter < frame_num and not self.frame is None:
             try:
                 self.frame = self.reader._readFrame()
@@ -78,34 +84,100 @@ class VideoTrack:
 # fixme: need to consider portrait video aspect ratios
 # fixme: figure out why zooming on some landscape videos in some cases
 #        doesn't always fill the grid cell (see Coeur, individual grades.) 
-def render_combined_video(project, video_names, offsets, rotate_hints={}):
+def render_combined_video(project, video_names, offsets, rotate_hints={},
+                          title_page=None, credits_page=None):
     # 1080p
     output_w = 1920
     output_h = 1080
     output_fps = 30
     border = 10
-    
+
+    # load static pages if specified
+    if title_page:
+        title_rgb = cv2.imread(os.path.join(project, title_page),
+                               flags=cv2.IMREAD_ANYCOLOR|cv2.IMREAD_ANYDEPTH)
+        title_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
+        (h, w) = title_rgb.shape[:2]
+        scale_w = output_w / w
+        scale_h = output_h / h
+        if scale_w < scale_h:
+            title_scale = cv2.resize(title_rgb, (0,0), fx=scale_w,
+                                     fy=scale_w,
+                                     interpolation=cv2.INTER_AREA)
+        else:
+            title_scale = cv2.resize(title_rgb, (0,0), fx=scale_h,
+                                     fy=scale_h,
+                                     interpolation=cv2.INTER_AREA)
+        x = int((output_w - title_scale.shape[1]) / 2)
+        y = int((output_h - title_scale.shape[0]) / 2)
+        title_frame[y:y+title_scale.shape[0],x:x+title_scale.shape[1]] = title_scale
+        #cv2.imshow("title", title_frame)
+    if credits_page:
+        credits_rgb = cv2.imread(os.path.join(project, credits_page),
+                                 flags=cv2.IMREAD_ANYCOLOR|cv2.IMREAD_ANYDEPTH)
+        credits_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
+        (h, w) = credits_rgb.shape[:2]
+        scale_w = output_w / w
+        scale_h = output_h / h
+        if scale_w < scale_h:
+            credits_scale = cv2.resize(credits_rgb, (0,0), fx=scale_w,
+                                     fy=scale_w,
+                                     interpolation=cv2.INTER_AREA)
+        else:
+            credits_scale = cv2.resize(credits_rgb, (0,0), fx=scale_h,
+                                     fy=scale_h,
+                                     interpolation=cv2.INTER_AREA)
+        x = int((output_w - credits_scale.shape[1]) / 2)
+        y = int((output_h - credits_scale.shape[0]) / 2)
+        credits_frame[y:y+credits_scale.shape[0],x:x+credits_scale.shape[1]] = credits_scale
+        #cv2.imshow("credits", credits_frame)
+
     # open all video clips and advance to clap sync point
     videos = []
-    max_duration = 0
+    durations = []
     for i, file in enumerate(video_names):
         v = VideoTrack()
         path = os.path.join(project, file)
         if v.open(path):
             videos.append(v)
-            if v.duration + offsets[i] > max_duration:
-                max_duration = v.duration + offsets[i]
-    print("group video duration:", max_duration)
+            durations.append(v.duration + offsets[i])
+    duration = np.median(durations)
+    if credits_page:
+        duration += 4
+    
+    print("group video duration:", duration)
     
     if len(videos) == 0:
         return
 
-    cols = int(math.sqrt(len(videos)))
-    rows = int(math.sqrt(len(videos)))
-    if cols * rows < len(videos):
-        cols += 1
-    if cols * rows < len(videos):
-        rows += 1
+    # plan our grid
+    num_portrait = 0
+    num_landscape = 0
+    for v in videos:
+        print(type(v), v)
+        if not v.frame is None:
+            (h, w) = v.frame.shape[:2]
+            if w > h:
+                num_landscape += 1
+            else:
+                num_portrait += 1
+    landscape = True
+    if num_portrait > num_landscape:
+        landscape = False
+
+    cols = 1
+    rows = 1
+    while cols * rows < len(videos):
+        if landscape:
+            if cols <= rows:
+                cols += 1
+            else:
+                rows += 1
+        else:
+            if cols < rows*4:
+                cols += 1
+            else:
+                rows += 1
     print("video grid:", cols, "x", rows)
     grid_w = int(output_w / cols)
     grid_h = int(output_h / rows)
@@ -122,6 +194,7 @@ def render_combined_video(project, video_names, offsets, rotate_hints={}):
     lossless = {
         # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
         '-vcodec': 'libx264',  # use the h.264 codec
+        '-pix_fmt': 'yuv420p', # support 'dumb' players
         '-crf': '0',           # set the constant rate factor to 0, (lossless)
         '-preset': 'veryslow', # maximum compression
         '-r': str(output_fps)  # match input fps
@@ -129,6 +202,7 @@ def render_combined_video(project, video_names, offsets, rotate_hints={}):
     sane = {
         # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
         '-vcodec': 'libx264',  # use the h.264 codec
+        '-pix_fmt': 'yuv420p', # support 'dumb' players
         '-crf': '17',          # visually lossless (or nearly so)
         '-preset': 'medium',   # default compression
         '-r': str(output_fps)  # match input fps
@@ -138,13 +212,11 @@ def render_combined_video(project, video_names, offsets, rotate_hints={}):
     done = False
     frames = [None] * len(videos)
     output_time = 0
-    pbar = tqdm(total=int(max_duration*output_fps), smoothing=0.1)
-    while not done:
-        done = True
+    pbar = tqdm(total=int(duration*output_fps), smoothing=0.1)
+    while output_time <= duration:
         for i, v in enumerate(videos):
             frame = v.get_frame(output_time - offsets[i])
             if not frame is None:
-                done = False
                 basevid = os.path.basename(video_names[i])
                 #print("basevid:", basevid)
                 if basevid in rotate_hints:
@@ -194,26 +266,47 @@ def render_combined_video(project, video_names, offsets, rotate_hints={}):
             else:
                 # fade
                 frames[i] = (frames[i] * 0.9).astype('uint8')
-                if np.any(frames[i]):
-                    done = False
-        if not done:
-            main_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
-            row = 0
-            col = 0
-            for i, f in enumerate(frames):
-                if not f is None:
-                    x = int(round(border + col * (cell_w + border)))
-                    y = int(round(border + row * (cell_h + border)))
-                    main_frame[y:y+f.shape[0],x:x+f.shape[1]] = f
-                col += 1
-                if col >= cols:
-                    col = 0
-                    row += 1
-            cv2.imshow("main", main_frame)
-            cv2.waitKey(1)
-            writer.writeFrame(main_frame[:,:,::-1])  #write the frame as RGB not BGR
-            output_time += 1 / output_fps
-            pbar.update(1)
+        main_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
+
+        row = 0
+        col = 0
+        for i, f in enumerate(frames):
+            if not f is None:
+                x = int(round(border + col * (cell_w + border)))
+                y = int(round(border + row * (cell_h + border)))
+                main_frame[y:y+f.shape[0],x:x+f.shape[1]] = f
+            col += 1
+            if col >= cols:
+                col = 0
+                row += 1
+        #cv2.imshow("main", main_frame)
+
+        if title_page and output_time <= 5:
+            if output_time < 4:
+                alpha = 1
+            elif output_time >= 4 and output_time <= 5:
+                alpha = (5 - output_time) / (5 - 4)
+            else:
+                alpha = 0
+            #print("time:", output_time, "alpha:", alpha)
+            output_frame = cv2.addWeighted(title_frame, alpha, main_frame, 1 - alpha, 0)
+        elif credits_page and output_time >= duration - 5:
+            if output_time >= duration - 4:
+                alpha = 1
+            elif output_time >= duration - 5 and output_time < duration - 4:
+                alpha = 1 - ((duration - 4) - output_time) / (5 - 4)
+            else:
+                alpha = 0
+            #print("time:", output_time, "alpha:", alpha)
+            output_frame = cv2.addWeighted(credits_frame, alpha, main_frame, 1 - alpha, 0)
+        else:
+            output_frame = main_frame
+        cv2.imshow("output", output_frame)
+        cv2.waitKey(1)
+
+        writer.writeFrame(output_frame[:,:,::-1])  #write the frame as RGB not BGR
+        output_time += 1 / output_fps
+        pbar.update(1)
     pbar.close()
     writer.close()
 
@@ -225,3 +318,17 @@ def merge(project):
     output_video = os.path.join(project, "final.mp4")
     result = call(["ffmpeg", "-i", input_video, "-i", input_audio, "-c:v", "copy", "-c:a", "aac", "-y", output_video])
     print("ffmpeg result code:", result)
+
+# https://superuser.com/questions/258032/is-it-possible-to-use-ffmpeg-to-trim-off-x-seconds-from-the-beginning-of-a-video/269960
+# ffmpeg -i input.flv -ss 2 -vcodec copy -acodec copy output.flv
+#   -vcodec libx264 -crf 0
+
+#ffmpeg -f lavfi -i color=c=black:s=1920x1080:r=25:d=1 -i testa444.mov -filter_complex "[0:v] trim=start_frame=1:end_frame=5 [blackstart]; [0:v] trim=start_frame=1:end_frame=3 [blackend]; [blackstart] [1:v] [blackend] concat=n=3:v=1:a=0[out]" -map "[out]" -c:v qtrle -c:a copy -timecode 01:00:00:00 test16.mov
+
+def trim_videos(project, video_names, offsets):
+    for video in video_names:
+        input_file = os.path.join(project, video)
+        head, tail = os.path.split(input_file)
+        output_file = os.path.join(head, "aligned" + tail)
+        result = call(["ffmpeg", "-i", input_video, "-ss", offsets[i],
+                       "-vcodec", "libx264", "-acodec", "copy", output_file])
