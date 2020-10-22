@@ -8,11 +8,7 @@ fascinating world (without requiring audio or video editing experience
 or expensive software) so that you and your performers can show off
 your efforts and talents!
 
-[![Natus est Nobis](http://img.youtube.com/vi/Z_pOPgHhDyI/0.jpg)](https://www.youtube.com/watch?v=Z_pOPgHhDyI "Natus est Nobis")
-
-<iframe width="560" height="315" src="https://www.youtube.com/embed/Z_pOPgHhDyI" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-
-![demo choir](images/combined.png?raw=true "Combined Demo")
+[![Natus est Nobis](http://img.youtube.com/vi/Z_pOPgHhDyI/0.jpg)](https://www.youtube.com/watch?v=Z_pOPgHhDyI "Natus est Nobis (demo of software)")
 
 ## Basic workflow
 
