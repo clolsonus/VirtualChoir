@@ -17,7 +17,7 @@ def my_xml_traverse(node, indent=""):
         # leaf
         print(indent, "leaf:", node.tag, node.text)
         
-def sync_folder(url):
+def sync_folder(url, subpath=None):
     tmp1 = url.split('/')
     tmp2 = tmp1[-1].split('?')
     folder_id = tmp2[0]
@@ -58,7 +58,10 @@ def sync_folder(url):
         return
     
     # work_dir
-    work_dir = os.path.join(project_dir, folder_id)
+    if subpath:
+        work_dir = subpath
+    else:
+        work_dir = os.path.join(project_dir, folder_id)
     # create if needed
     if not os.path.exists(work_dir):
         print("Creating:", work_dir)
@@ -76,20 +79,27 @@ def sync_folder(url):
         print("  adate:", entry[9])
         print("  mdate:", entry[10])
         print("  size:", entry[13])
-        url = "https://drive.google.com/uc?export=download&id=%s" % entry[0]
-        print("  download url:", url)
-        dest_file = os.path.join(work_dir, entry[2])
-        if dest_file.endswith(".m4a"):
-            if os.path.exists(dest_file):
-                statinfo = os.stat(dest_file)
-                mtime = statinfo.st_mtime
-                if entry[10]/1000 <= mtime:
-                    print("Skipping, already downloaded")
-                    continue
-            print("Downloading:", url)
-            print("Saving as:", dest_file)
-            html = common.urlread(url)
-            with open(dest_file, 'wb') as f:
-                f.write(html)
-                f.close()
-            os.utime(dest_file, times=(entry[9]/1000, entry[10]/1000))
+        if entry[3].endswith("folder"):
+            # recurse folders
+            newurl = "https://drive.google.com/drive/folders/" + entry[0]
+            newpath = os.path.join(work_dir, entry[2])
+            sync_folder(newurl, newpath)
+        else:
+            # fetch file
+            url = "https://drive.google.com/uc?export=download&id=%s" % entry[0]
+            print("  download url:", url)
+            dest_file = os.path.join(work_dir, entry[2])
+            if True or dest_file.endswith(".m4a"):
+                if os.path.exists(dest_file):
+                    statinfo = os.stat(dest_file)
+                    mtime = statinfo.st_mtime
+                    if entry[10]/1000 <= mtime:
+                        print("Skipping, already downloaded")
+                        continue
+                print("Downloading:", url)
+                print("Saving as:", dest_file)
+                html = common.urlread(url)
+                with open(dest_file, 'wb') as f:
+                    f.write(html)
+                    f.close()
+                os.utime(dest_file, times=(entry[9]/1000, entry[10]/1000))
