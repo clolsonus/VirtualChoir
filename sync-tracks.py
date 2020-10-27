@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser(description='virtual choir')
 parser.add_argument('project', help='project folder')
 parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
                     help='sync strategy')
+parser.add_argument('--reference', help='file name of declared refrence track')
 parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
 parser.add_argument('--write-aligned-audio', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
 parser.add_argument('--write-aligned-video', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
@@ -30,6 +31,7 @@ audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "ogg", "wav" ]
 video_extensions = [ "avi", "mov", "mp4" ]
 audacity_extension = "aup"
 ignore_extensions = [ "au", "lof", "txt", "zip" ]
+ignore_files = [ "gridded_video", "mixed_audio", "silent_video" ]
 audio_tracks = []
 video_tracks = []
 title_page = None
@@ -48,7 +50,7 @@ def scan_directory(path, pretty_path=""):
             scan_directory(fullname, os.path.join(pretty_path, file))
         else:
             basename, ext = os.path.splitext(file)
-            if basename == "group" or basename == "final":
+            if basename in ignore_files:
                 continue
             if not len(ext) or ext[1:].lower() in ignore_extensions:
                 continue
@@ -110,7 +112,7 @@ if os.path.exists(hints_file):
                     print("bad hint.txt syntax:", row)
             else:
                 print("hint unknown (or typo):", row)
-        
+
 # load audio tracks and normalize
 print("loading audio tracks...")
 audio_samples = []
@@ -122,6 +124,7 @@ for track in tqdm(audio_tracks):
     if ext == ".aif":
         ext = ".aiff"
     sample = AudioSegment.from_file(path, ext[1:])
+    sample = sample.set_channels(2) # force samples to be stereo
     sample = sample.set_sample_width(2) # force to 2 for this project
     sample = sample.normalize()
     if sample.frame_rate > max_frame_rate:
@@ -157,8 +160,19 @@ if not aup_project:
     #audio_group.gen_plots(audio_samples, audio_raws, audio_tracks, sync_offsets=None)
 
     print("correlating audio samples")
-    if args.sync == "clarity":
-        audio_group.correlate_by_generic(audio_group.clarity_list, plot=False)
+    if args.reference:
+        ref_index = -1
+        for i, name in enumerate(audio_tracks):
+            if name.endswith(args.reference):
+                ref_index = i
+                print("found reference track, index:", i)
+        if ref_index < 0:
+            print("Unable to match reference track name, giving up.")
+            quit()
+        #audio_group.correlate_to_reference(ref_index, audio_group.clarity_list, plot=True)
+        audio_group.correlate_to_reference(ref_index, audio_group.note_list, plot=True)
+    elif args.sync == "clarity":
+        audio_group.correlate_mutual(audio_group.clarity_list, plot=False)
     elif args.sync == "clap":
         audio_group.sync_by_claps()
     #else:
@@ -183,7 +197,7 @@ else:
     mute_tracks = []
 mixed = mixer.combine(audio_tracks, audio_samples, sync_offsets, mute_tracks,
                       gain_hints=gain_hints, pan_range=0.25)
-group_file = os.path.join(args.project, "group.mp3")
+group_file = os.path.join(args.project, "mixed_audio.mp3")
 mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 #playback.play(mixed)
 
