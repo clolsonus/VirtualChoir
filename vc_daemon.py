@@ -7,6 +7,7 @@ import time
 import urllib.request
 
 from services import common
+# from services import filemail
 from services import responses
 
 settings = common.get_config()
@@ -19,18 +20,20 @@ mailbox = MailBox(settings["host"])
 mailbox.login(settings["user"], settings["password"])
 while True:
     now = datetime.datetime.now()
-    notification = False
     print("Checking for new mail notifications:",
           now.strftime("%Y-%m-%d %H:%M:%S"))
     mailbox.folder.set("INBOX")
-    messages = mailbox.fetch(AND(all=True), headers_only=True)
+    # messages = mailbox.fetch(AND(all=True), headers_only=True)
     # messages = mailbox.fetch(AND(seen=False), headers_only=True)
+    messages = mailbox.fetch(AND(seen=False))
+    form_notification = False
     for msg in messages:
+        print(msg.from_)
         print(msg.subject)
         if "Virtual Choir" in msg.subject:
-            notification = True
-    if notification:
-        print("new work ...")
+            form_notification = True
+    if form_notification:
+        print("new google form work ...")
         responses.fetch( settings["responses"] )
         responses.process()
     # subjects = [msg.subject for msg in mailbox.fetch(AND(all=True))]
