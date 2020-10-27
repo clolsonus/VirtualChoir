@@ -23,6 +23,8 @@ class gdrive():
     SCOPES = ['https://www.googleapis.com/auth/drive']
 
     def __init__(self):
+        self.folder_name = None
+        
         creds = None
         # The file token.pickle stores the user's access and refresh
         # tokens, and is created automatically when the authorization
@@ -44,28 +46,69 @@ class gdrive():
             with open(tp_file, 'wb') as token:
                 pickle.dump(creds, token)
         self.service = build('drive', 'v3', credentials=creds)
- 
-    def sync_folder(self, url, subpath=None):
+
+    def get_folder_id(self, url):
         tmp1 = url.split('/')
         tmp2 = tmp1[-1].split('?')
         folder_id = tmp2[0]
         print('folder_id:', folder_id)
+        return folder_id
 
+    def fix_extension(self, name, mimeType):
+        basename, ext = os.path.splitext(name)
+        print("fix_extension:", basename, ":", ext)
+        if len(ext):
+            return name
+        else:
+            print("Need to fix extension:", name)
+            # add an extension based on mimeType
+            if mimeType.startswith("audio/"):
+                ext = mimeType[6:]
+                if ext.startswith("x-"):
+                    ext = ext[2:]
+                elif ext == "mpeg":
+                    # rewrite this as an unambiguous audio extension
+                    ext = "mp3"
+                if len(ext) < 2:
+                    # fall back guess, sorry
+                    ext = "mp3"
+            elif mimeType.startswith("video/"):
+                ext = mimeType[6:]
+                if ext == "quicktime":
+                    ext = "mov"
+                if len(ext) < 2:
+                    # fall back guess, sorry
+                    ext = "mp4"
+            else:
+                ext = "totally_unknown"
+            return basename + "." + ext
+            
+    def sync_folder(self, url, subpath=None):
+        folder_id = self.get_folder_id(url)
+        
         project_dir = os.path.join(common.vcdir, "projects")
         # create if needed
         if not os.path.exists(project_dir):
             print("Creating:", project_dir)
             os.makedirs(project_dir)
 
+        # Get shared folder details
+        results = self.service.files().get(fileId=folder_id, fields='*').execute()
+        print("results:", results)
+        if "name" in results:
+            self.folder_name = results["name"]
+        else:
+            self.folder_name = folder_id
+        
         # Call the Drive v3 API
         results = self.service.files().list(
             q="'" + folder_id + "' in parents",
-            pageSize=20,
+            pageSize=100,
             fields="nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, trashed)").execute()
         items = results.get('files', [])
         if not items:
             print('No files found.')
-            return
+            return False
 
         # work_dir
         if subpath:
@@ -95,7 +138,8 @@ class gdrive():
                 sync_folder(newurl, newpath)
             else:
                 # fetch file
-                dest_file = os.path.join(work_dir, item['name'])
+                name = self.fix_extension(item['name'], item['mimeType'])
+                dest_file = os.path.join(work_dir, name)
                 if os.path.exists(dest_file):
                     statinfo = os.stat(dest_file)
                     mtime = statinfo.st_mtime
@@ -115,3 +159,4 @@ class gdrive():
                     f.write(fh.getvalue())
                     f.close()
                 os.utime(dest_file, times=(created, modified))
+        return True
