@@ -2,7 +2,9 @@ import csv
 from datetime import datetime
 import json
 import os
+from subprocess import call
 import time
+from zipfile import ZipFile
 
 from . import common
 from . import gdrive
@@ -39,10 +41,52 @@ def process():
         save_last_time(new_time)        
 
 def run_job(request):
-    # extract google folder id
+    # sync the shared google drive folder
     url = request['Public google drive folder share link']
-    gdrive.sync_folder(url)
+    gd = gdrive.gdrive()
+    if "google.com" in url:
+        gd.sync_folder(url)
+    else:
+        print("this doesn't look like a google drive url.")
+        print("aborting...")
+        return
 
+    # do the thing
+    folder_id = gd.get_folder_id(url)
+    work_dir = os.path.join(common.vcdir, "projects", folder_id)
+    command = [ "./sync-tracks.py", work_dir ]
+    if request['Synchronization Strategy'] == "Claps":
+        command.append( "--sync" )
+        command.append( "clap" )
+    if len(request['Additional Options']):
+        options = request['Additional Options'].split(", ")
+        if "Mute videos" in options:
+            command.append("--mute-videos")
+    print("Running command:", command)
+    call(command)
+
+    # zip the results
+    zip_file = os.path.join(work_dir, gd.folder_name + ".zip")
+    result_files = [ "mixed_audio.mp3",
+                     "gridded_video.mp4",
+                     "audacity_import.lof" ]
+    with ZipFile(zip_file, "w") as zip:
+        for file in result_files:
+            print("  adding:", file)
+            full_name = os.path.join(work_dir, file)
+            if os.path.exists(full_name):
+                zip.write(full_name, arcname=file)
+
+    # send the results
+    command = [ "./FilemailCli",
+                "--files=%s" % zip_file,
+                "--to=%s" % request["Email Address"],
+                "--from=no-reply-virtualchoir@flightgear.org",
+                "--subject='Your virtual choir song: " + gd.folder_name + " is ready!'",
+                "--verbose=true" ]
+    print("Running command:", command)
+    call(command)
+    
 # read the saved time
 def get_last_time():
     last_time = 0
