@@ -8,7 +8,7 @@ def combine(names, samples, sync_offsets, mute_tracks,
             gain_hints={}, pan_range=0):
     durations_ms = []
     for i, sample in enumerate(samples):
-        print(names[i], len(sample) / 1000, sync_offsets[i])
+        # print(names[i], len(sample) / 1000, sync_offsets[i])
         durations_ms.append( len(sample) - sync_offsets[i] )
     duration_ms = np.median(durations_ms)
     print("median audio duration (ms):", duration_ms)
@@ -61,6 +61,9 @@ def combine(names, samples, sync_offsets, mute_tracks,
                 #print("extending sample by:", diff)
                 y = np.concatenate([y, np.zeros(diff)], axis=None)
             y_mixed += (y * track_gain)
+    if mixed_count < 1:
+        print("No unmuted audio tracks found.")
+        return AudioSegment.silent(1000)
     y_mixed *= (1 / math.sqrt(mixed_count)) # balsy but good chance of working
     #y_mixed *= (1 / math.pow(mixed_count, 0.6)) # slightly more conservative
     #y_mixed *= (1 / len(mixed_count)) # very conservative output levels
