@@ -4,6 +4,7 @@ import math
 import numpy as np
 import os
 import skvideo.io               # pip install sk-video
+from subprocess import call
 from tqdm import tqdm
 
 class VideoTrack:
@@ -16,7 +17,7 @@ class VideoTrack:
         #print(metadata.keys())
         if not "video" in metadata:
             return False
-        print(json.dumps(metadata["video"], indent=4))
+        #print(json.dumps(metadata["video"], indent=4))
         fps_string = metadata['video']['@r_frame_rate']
         (num, den) = fps_string.split('/')
         self.fps = float(num) / float(den)
@@ -112,10 +113,11 @@ def render_combined_video(project, video_names, offsets, rotate_hints={},
         y = int((output_h - title_scale.shape[0]) / 2)
         title_frame[y:y+title_scale.shape[0],x:x+title_scale.shape[1]] = title_scale
         #cv2.imshow("title", title_frame)
+        
+    credits_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
     if credits_page:
         credits_rgb = cv2.imread(os.path.join(project, credits_page),
                                  flags=cv2.IMREAD_ANYCOLOR|cv2.IMREAD_ANYDEPTH)
-        credits_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
         (h, w) = credits_rgb.shape[:2]
         scale_w = output_w / w
         scale_h = output_h / h
@@ -142,10 +144,8 @@ def render_combined_video(project, video_names, offsets, rotate_hints={},
             videos.append(v)
             durations.append(v.duration + offsets[i])
     duration = np.median(durations)
-    if credits_page:
-        duration += 4
-    
-    print("group video duration:", duration)
+    duration += 4 # for credits/fade out
+    print("median video duration (with fade to credits):", duration)
     
     if len(videos) == 0:
         return
@@ -154,7 +154,6 @@ def render_combined_video(project, video_names, offsets, rotate_hints={},
     num_portrait = 0
     num_landscape = 0
     for v in videos:
-        print(type(v), v)
         if not v.frame is None:
             (h, w) = v.frame.shape[:2]
             if w > h:
@@ -207,7 +206,7 @@ def render_combined_video(project, video_names, offsets, rotate_hints={},
         '-preset': 'medium',   # default compression
         '-r': str(output_fps)  # match input fps
     }
-    output_file = os.path.join(project, "group.mp4")
+    output_file = os.path.join(project, "silent_video.mp4")
     writer = skvideo.io.FFmpegWriter(output_file, inputdict=inputdict, outputdict=sane)
     done = False
     frames = [None] * len(videos)
@@ -290,7 +289,7 @@ def render_combined_video(project, video_names, offsets, rotate_hints={},
                 alpha = 0
             #print("time:", output_time, "alpha:", alpha)
             output_frame = cv2.addWeighted(title_frame, alpha, main_frame, 1 - alpha, 0)
-        elif credits_page and output_time >= duration - 5:
+        elif output_time >= duration - 5:
             if output_time >= duration - 4:
                 alpha = 1
             elif output_time >= duration - 5 and output_time < duration - 4:
@@ -312,10 +311,9 @@ def render_combined_video(project, video_names, offsets, rotate_hints={},
 
 def merge(project):
     # use ffmpeg to combine the video and audio tracks into the final movie
-    from subprocess import call
-    input_video = os.path.join(project, "group.mp4")
-    input_audio = os.path.join(project, "group.mp3")
-    output_video = os.path.join(project, "final.mp4")
+    input_video = os.path.join(project, "silent_video.mp4")
+    input_audio = os.path.join(project, "mixed_audio.mp3")
+    output_video = os.path.join(project, "gridded_video.mp4")
     result = call(["ffmpeg", "-i", input_video, "-i", input_audio, "-c:v", "copy", "-c:a", "aac", "-y", output_video])
     print("ffmpeg result code:", result)
 
