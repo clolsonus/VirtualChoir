@@ -6,6 +6,7 @@ import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from scipy.signal import find_peaks
 from tqdm import tqdm
 
 hop_length = 512
@@ -18,6 +19,7 @@ class SampleGroup():
         self.offset_list = []
         self.intensity_list = []
         self.clarity_list = []
+        self.note_list = []
     
     def load(self, filename, names):
         if not os.path.exists(filename):
@@ -77,9 +79,13 @@ class SampleGroup():
             b = len(self.intensity_list[i])
             c = chroma.shape[1]
             min = np.min([a, b, c])
+            notes = np.zeros(min)
             clarity = np.zeros(min)
+            imax = np.max(self.intensity_list[i])
             for j in range(min):
+                notes[j] = np.argmax(chroma[:,j]) * (self.intensity_list[i][j] / imax)
                 clarity[j] = (chroma[:,j] < 0.2).sum() * self.intensity_list[i][j]
+            self.note_list.append(notes.T)
             self.clarity_list.append(clarity.T)
 
     def compute_basic(self, samples, raws):
@@ -207,7 +213,7 @@ class SampleGroup():
         count = 0
         offsets = offset_matrix[0,:]
         self.pretty_print_offset_array(offsets)
-        while not done:
+        while not done and count < 1000:
             done = True
             count += 1
             offsets_ss = np.copy(offsets)
@@ -227,7 +233,7 @@ class SampleGroup():
         offsets -= np.median(offsets)
         return offsets                
  
-    def correlate_by_generic(self, metric_list, offset_shift=None, plot=False):
+    def correlate_mutual(self, metric_list, offset_shift=None, plot=False):
         # compute relative time offsets by best correlation
         num = len(metric_list)
         offset_matrix = np.zeros( (num, num) )
@@ -292,6 +298,85 @@ class SampleGroup():
         for i in range(len(self.offset_list)):
             self.offset_list[i] -= self.shift
 
+    def mydiff(self, a, b):
+        an = a.shape[0]
+        bn = b.shape[0]
+        pad = np.zeros(a.shape[0])
+        b1 = np.concatenate((pad, b, pad), axis=None)
+        result = []
+        for i in range(an+bn):
+            # print(i)
+            diff = a - b1[i:i+an]
+            result.append(np.sum(diff*diff))
+        result = np.array(result)
+        result = np.amax(result) - result
+        return result
+    
+    def correlate_to_reference(self, ref_index, metric_list, offset_shift=None, plot=False):
+        # compute relative time offsets by best correlation
+        num = len(metric_list)
+        self.offset_list = [0] * num
+        for i in range(0, num):
+            print(ref_index, i, metric_list[ref_index].shape, metric_list[i].shape)
+            ycorr = np.correlate(metric_list[ref_index],
+                                 metric_list[i],
+                                 mode='full')
+            #ycorr = self.mydiff(metric_list[ref_index], metric_list[i])
+            max_val = np.amax(ycorr)
+            peaks, _ = find_peaks(ycorr, height=max_val*0.8, distance=50)
+            max_index = np.argmax(ycorr)
+            print("max index:", max_index)
+            if max_index > len(metric_list[i]):
+                shift = max_index - len(metric_list[i])
+                shift_time = self.time_list[ref_index][shift]
+                plot1 = metric_list[ref_index]
+                plot2 = np.concatenate([np.zeros(shift),
+                                        metric_list[i]])
+                print(ref_index, i, self.time_list[ref_index][shift])
+            elif max_index < len(metric_list[i]):
+                shift = len(metric_list[i]) - max_index
+                shift_time = -self.time_list[i][shift]
+                plot1 = np.concatenate([np.zeros(shift),
+                                        metric_list[ref_index]], axis=None)
+                plot2 = metric_list[i]
+                print(ref_index, -self.time_list[i][shift])
+            else:
+                plot1 = metric_list[ref_index]
+                plot2 = metric_list[i]
+                shift = 0
+                shift_time = 0
+                print(ref_index, 0)
+            self.offset_list[i] = shift_time
+            if plot:
+                plt.figure()
+                plt.plot(ycorr)
+                plt.plot(peaks, ycorr[peaks], "x")
+                plt.figure()
+                plt.plot(plot1, label=ref_index)
+                plt.plot(plot2, label=i)
+                plt.legend()
+                plt.show()
+        print("offset_list:\n", self.offset_list)
+
+        if False:
+            self.offset_list = []
+            for i in range(num):
+                diff_array = offset_matrix[0,:] - offset_matrix[i,:]
+                median = np.median(diff_array)
+                print(offset_matrix[i,:])
+                print(diff_array)
+                print(median, np.mean(diff_array), np.std(diff_array))
+                self.offset_list.append(median)
+        print(self.offset_list)
+        if offset_shift is None:
+            #self.shift = np.max(self.offset_list)
+            self.shift = 0.0
+        else:
+            self.shift = offset_shift
+        self.max_index = np.argmax(self.offset_list)
+        for i in range(len(self.offset_list)):
+            self.offset_list[i] -= self.shift
+
     # sync by claps
     def sync_by_claps(self):
         # presumes onset envelopes and clarities have been computed
@@ -333,7 +418,7 @@ class SampleGroup():
             box = np.ones(box_pts)/box_pts
             lead_list[i] = np.convolve(lead_list[i], box, mode='same')
             
-        self.correlate_by_generic(lead_list, plot=False)
+        self.correlate_mutual(lead_list, plot=False)
                 
     # visualize audio streams (using librosa functions)
     def gen_plots(self, samples, raws, names, sync_offsets=None):
