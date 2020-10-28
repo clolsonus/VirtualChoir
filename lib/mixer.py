@@ -72,7 +72,7 @@ def combine(names, samples, sync_offsets, mute_tracks,
     mixed.normalize()
     return mixed
     
-def save_aligned(project, names, samples, sync_offsets, mute_tracks,):
+def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
     print("Writing aligned version of samples (padded/trimed)...")
     for i, sample in enumerate(samples):
         if names[i] in mute_tracks:
@@ -92,7 +92,7 @@ def save_aligned(project, names, samples, sync_offsets, mute_tracks,):
             synced_sample = pad + sample
         basename = os.path.basename(names[i])
         name, ext = os.path.splitext(basename)
-        output_file = os.path.join(project, "aligned_" + name + ".wav")
+        output_file = os.path.join(results_dir, "aligned_" + name + ".mp3")
         print(" ", output_file, "offset(ms):", sync_offset)
-        synced_sample.export(output_file, format="wav")
+        synced_sample.export(output_file, format="mp3")
     

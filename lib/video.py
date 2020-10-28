@@ -85,7 +85,8 @@ class VideoTrack:
 # fixme: need to consider portrait video aspect ratios
 # fixme: figure out why zooming on some landscape videos in some cases
 #        doesn't always fill the grid cell (see Coeur, individual grades.) 
-def render_combined_video(project, video_names, offsets, rotate_hints={},
+def render_combined_video(project, results_dir,
+                          video_names, offsets, rotate_hints={},
                           title_page=None, credits_page=None):
     # 1080p
     output_w = 1920
@@ -206,7 +207,7 @@ def render_combined_video(project, video_names, offsets, rotate_hints={},
         '-preset': 'medium',   # default compression
         '-r': str(output_fps)  # match input fps
     }
-    output_file = os.path.join(project, "silent_video.mp4")
+    output_file = os.path.join(results_dir, "silent_video.mp4")
     writer = skvideo.io.FFmpegWriter(output_file, inputdict=inputdict, outputdict=sane)
     done = False
     frames = [None] * len(videos)
@@ -309,11 +310,11 @@ def render_combined_video(project, video_names, offsets, rotate_hints={},
     pbar.close()
     writer.close()
 
-def merge(project):
+def merge(results_dir):
     # use ffmpeg to combine the video and audio tracks into the final movie
-    input_video = os.path.join(project, "silent_video.mp4")
-    input_audio = os.path.join(project, "mixed_audio.mp3")
-    output_video = os.path.join(project, "gridded_video.mp4")
+    input_video = os.path.join(results_dir, "silent_video.mp4")
+    input_audio = os.path.join(results_dir, "mixed_audio.mp3")
+    output_video = os.path.join(results_dir, "gridded_video.mp4")
     result = call(["ffmpeg", "-i", input_video, "-i", input_audio, "-c:v", "copy", "-c:a", "aac", "-y", output_video])
     print("ffmpeg result code:", result)
 

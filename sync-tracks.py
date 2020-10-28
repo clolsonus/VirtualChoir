@@ -46,7 +46,7 @@ def scan_directory(path, pretty_path=""):
         fullname = os.path.join(path, file)
         pretty_name = os.path.join(pretty_path, file)
         # print(pretty_name)
-        if os.path.isdir(fullname):
+        if os.path.isdir(fullname) and file != "results":
             scan_directory(fullname, os.path.join(pretty_path, file))
         else:
             basename, ext = os.path.splitext(file)
@@ -113,6 +113,12 @@ if os.path.exists(hints_file):
             else:
                 print("hint unknown (or typo):", row)
 
+# make results directory (if it doesn't exist)
+results_dir = os.path.join(args.project, "results")
+if not os.path.exists(results_dir):
+    print("Creating:", results_dir)
+    os.makedirs(results_dir)
+    
 # load audio tracks and normalize
 print("loading audio tracks...")
 audio_samples = []
@@ -180,7 +186,7 @@ if not aup_project:
     #                                  audio_group.time_list[0],
     #                                  plot=True)
     
-    with open(os.path.join(args.project, "audacity_import.lof"), 'w') as fp:
+    with open(os.path.join(results_dir, "audacity_import.lof"), 'w') as fp:
         for i in range(len(audio_group.offset_list)):
             fp.write('file "%s" offset %.3f\n' % (audio_tracks[i], audio_group.offset_list[i]))
     for i in range(len(audio_group.offset_list)):
@@ -197,13 +203,13 @@ else:
     mute_tracks = []
 mixed = mixer.combine(audio_tracks, audio_samples, sync_offsets, mute_tracks,
                       gain_hints=gain_hints, pan_range=0.25)
-group_file = os.path.join(args.project, "mixed_audio.mp3")
+group_file = os.path.join(results_dir, "mixed_audio.mp3")
 mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 #playback.play(mixed)
 
 if args.write_aligned_audio:
     # write trimmed/padded samples for 'easy' alignment
-    mixer.save_aligned(args.project, audio_tracks, audio_samples, sync_offsets,
+    mixer.save_aligned(results_dir, audio_tracks, audio_samples, sync_offsets,
                        mute_tracks)
 
 if len(video_tracks):
@@ -213,11 +219,12 @@ if len(video_tracks):
         print(track, ai, -sync_offsets[ai] / 1000)
         video_offsets.append( -sync_offsets[ai] / 1000 )
     # render the new combined video
-    video.render_combined_video( args.project, video_tracks, video_offsets,
+    video.render_combined_video( args.project, results_dir,
+                                 video_tracks, video_offsets,
                                  rotate_hints=rotate_hints,
                                  title_page=title_page,
                                  credits_page=credits_page )
-    video.merge( args.project )
+    video.merge( results_dir )
 
 if False:
     # plot basic clip waveforms

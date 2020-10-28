@@ -62,27 +62,42 @@ def run_job(request):
         options = request['Additional Options'].split(", ")
         if "Mute videos" in options:
             command.append("--mute-videos")
+        for o in options:
+            if o.startswith("Generate time aligned individual audio tracks"):
+                command.append("--write-aligned-audio")
+                break
     print("Running command:", command)
     call(command)
 
-    # zip the results
-    zip_file = os.path.join(work_dir, gd.folder_name + ".zip")
-    result_files = [ "mixed_audio.mp3",
-                     "gridded_video.mp4",
-                     "audacity_import.lof" ]
-    with ZipFile(zip_file, "w") as zip:
-        for file in result_files:
-            print("  adding:", file)
-            full_name = os.path.join(work_dir, file)
-            if os.path.exists(full_name):
-                zip.write(full_name, arcname=file)
+    if False:
+        # zip the results
+        zip_file = os.path.join(work_dir, gd.folder_name + ".zip")
+        result_files = [ "mixed_audio.mp3",
+                         "gridded_video.mp4",
+                         "audacity_import.lof" ]
+        with ZipFile(zip_file, "w") as zip:
+            for file in result_files:
+                print("  adding:", file)
+                full_name = os.path.join(work_dir, file)
+                if os.path.exists(full_name):
+                    zip.write(full_name, arcname=file)
 
+    # generate list of files
+    results_dir = os.path.join(work_dir, "results")
+    send_files = []
+    for file in sorted(os.listdir(results_dir)):
+        if file == "silent_video.mp4":
+            pass
+        else:
+            send_files.append( os.path.join(results_dir, file) )
+    print("sending files:", send_files)
     # send the results
     command = [ "./FilemailCli",
-                "--files=%s" % zip_file,
+                "--files=%s" % ",".join(send_files),
                 "--to=%s" % request["Email Address"],
                 "--from=no-reply-virtualchoir@flightgear.org",
                 "--subject='Your virtual choir song: " + gd.folder_name + " is ready!'",
+                "--days=7",
                 "--verbose=true" ]
     print("Running command:", command)
     call(command)
