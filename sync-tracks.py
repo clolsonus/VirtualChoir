@@ -12,6 +12,8 @@ from tqdm import tqdm
 
 from lib import analyze
 from lib import aup
+from lib import logger
+from lib.logger import log
 from lib import mixer
 from lib import video
 
@@ -21,6 +23,7 @@ parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
                     help='sync strategy')
 parser.add_argument('--reference', help='file name of declared refrence track')
 parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
+parser.add_argument('--no-video', action='store_true', help='skip the video production.')
 parser.add_argument('--write-aligned-audio', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
 parser.add_argument('--write-aligned-video', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
 
@@ -46,8 +49,11 @@ def scan_directory(path, pretty_path=""):
         fullname = os.path.join(path, file)
         pretty_name = os.path.join(pretty_path, file)
         # print(pretty_name)
-        if os.path.isdir(fullname) and file != "results":
-            scan_directory(fullname, os.path.join(pretty_path, file))
+        if os.path.isdir(fullname):
+            if file == "results" or file == "state":
+                pass
+            else:
+                scan_directory(fullname, os.path.join(pretty_path, file))
         else:
             basename, ext = os.path.splitext(file)
             if basename in ignore_files:
@@ -74,14 +80,16 @@ def scan_directory(path, pretty_path=""):
             else:
                 print("Unknown extenstion (skipping):", file)
 
+log("Begin processing job", fancy=True)
+
 scan_directory(args.project)
 
 if title_page:
-    print("title page:", title_page)
+    log("title page:", title_page)
 if credits_page:
-    print("credits page:", credits_page)
-print("audio tracks:", audio_tracks)
-print("video tracks:", video_tracks)
+    log("credits page:", credits_page)
+log("audio tracks:", audio_tracks)
+log("video tracks:", video_tracks)
 
 if aup_project:
     print("audacity project for sync:", aup_project)
@@ -90,7 +98,7 @@ hints_file = os.path.join(args.project, "hints.txt")
 gain_hints = {}
 rotate_hints = {}
 if os.path.exists(hints_file):
-    print("Found a hints.txt file, loading...")
+    log("Found a hints.txt file, loading...")
     with open(hints_file, 'r') as fp:
         reader = csv.reader(fp, delimiter=' ', skipinitialspace=True)
         for row in reader:
@@ -112,19 +120,23 @@ if os.path.exists(hints_file):
                     print("bad hint.txt syntax:", row)
             else:
                 print("hint unknown (or typo):", row)
-
+else:
+    log("no hints file found.")
+    
 # make results directory (if it doesn't exist)
 results_dir = os.path.join(args.project, "results")
 if not os.path.exists(results_dir):
     print("Creating:", results_dir)
     os.makedirs(results_dir)
-    
+
+# initialize logger
+logger.init( os.path.join(results_dir, "report.txt") )
+
 # load audio tracks and normalize
-print("loading audio tracks...")
+log("loading audio tracks...")
 audio_samples = []
 max_frame_rate = 0
-for track in tqdm(audio_tracks):
-    #print("loading:", track)
+for track in audio_tracks:
     basename, ext = os.path.splitext(track)
     path = os.path.join(args.project, track)
     if ext == ".aif":
@@ -135,22 +147,21 @@ for track in tqdm(audio_tracks):
     sample = sample.normalize()
     if sample.frame_rate > max_frame_rate:
         max_frame_rate = sample.frame_rate
+    log(" ", track, "rate:", sample.frame_rate, "channels:", sample.channels, "width:", sample.sample_width)
     audio_samples.append(sample)
     
-for i, sample in enumerate(audio_samples):
-    print(" ", audio_tracks[i], "rate:", sample.frame_rate, "channels:", sample.channels, "width:", sample.sample_width)
-
-print("max frame rate:", max_frame_rate)
+log("max sample rate:", max_frame_rate)
 for i, sample in enumerate(audio_samples):
     audio_samples[i] = audio_samples[i].set_frame_rate(max_frame_rate)
     
 sync_offsets = []
 if not aup_project:
     # let's figure out the autosync, fingers crossed!!!
+    log("Starting automatic track alignment process...", fancy=True)
     
     # generate mono version, set consistent sample rate, and filer for
     # analysis step
-    print("Processing audio samples...")
+    log("Analyzing audio tracks...")
     audio_raws = []
     for i, sample in enumerate(tqdm(audio_samples)):
         mono = audio_samples[i].set_channels(1) # convert to mono
@@ -165,7 +176,7 @@ if not aup_project:
     audio_group.compute_clarities(audio_samples, audio_raws)
     #audio_group.gen_plots(audio_samples, audio_raws, audio_tracks, sync_offsets=None)
 
-    print("correlating audio samples")
+    log("Correlating audio samples")
     if args.reference:
         ref_index = -1
         for i, name in enumerate(audio_tracks):
@@ -178,14 +189,17 @@ if not aup_project:
         #audio_group.correlate_to_reference(ref_index, audio_group.clarity_list, plot=True)
         audio_group.correlate_to_reference(ref_index, audio_group.note_list, plot=True)
     elif args.sync == "clarity":
+        log("Sync by mutual best fit")
         audio_group.correlate_mutual(audio_group.clarity_list, plot=False)
     elif args.sync == "clap":
+        log("Sync by lead in claps")
         audio_group.sync_by_claps()
     #else:
     #  audio_group.correlate_by_beats( audio_group.onset_list[0],
     #                                  audio_group.time_list[0],
     #                                  plot=True)
-    
+
+    log("Generating audacity_import.lof file")
     with open(os.path.join(results_dir, "audacity_import.lof"), 'w') as fp:
         for i in range(len(audio_group.offset_list)):
             fp.write('file "%s" offset %.3f\n' % (audio_tracks[i], audio_group.offset_list[i]))
@@ -193,26 +207,32 @@ if not aup_project:
         sync_offsets.append( -audio_group.offset_list[i] * 1000) # ms units
 else:
     # we found an audacity project, let's read the sync offsets from that
+    log("Found an audacity project file, using that for time syncs:",
+        aup_project, fancy=True)
     sync_offsets = aup.offsets_from_aup(audio_tracks, audio_samples,
                                         args.project, aup_project)
 
-print("Mixing samples...")
+log("Mixing samples...", fancy=True)
+
 if args.mute_videos:
+    log("Reqeust to mute the audio channels on videos: lip sync mode.")
     mute_tracks = video_tracks
 else:
     mute_tracks = []
 mixed = mixer.combine(audio_tracks, audio_samples, sync_offsets, mute_tracks,
                       gain_hints=gain_hints, pan_range=0.25)
 group_file = os.path.join(results_dir, "mixed_audio.mp3")
+log("Mixed audio file: mixed_audio.mp3")
 mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
-#playback.play(mixed)
 
 if args.write_aligned_audio:
+    log("Generating trim/padded tracks that all start together.")
     # write trimmed/padded samples for 'easy' alignment
     mixer.save_aligned(results_dir, audio_tracks, audio_samples, sync_offsets,
                        mute_tracks)
 
-if len(video_tracks):
+if len(video_tracks) and not args.no_video:
+    log("Generate gridded video", fancy=True)
     video_offsets = []
     for track in video_tracks:
         ai = audio_tracks.index(track)
@@ -225,45 +245,7 @@ if len(video_tracks):
                                  title_page=title_page,
                                  credits_page=credits_page )
     video.merge( results_dir )
+else:
+    log("No video tracks, or audio-only requested.")
 
-if False:
-    # plot basic clip waveforms
-    fig, ax = plt.subplots(nrows=len(audio_raws), sharex=True, sharey=True)
-    for i in range(len(audio_raws)):
-        sr = audio_samples[i].frame_rate
-        trimval = int(round(sync_offsets[i] * sr / 1000))
-        librosa.display.waveplot(np.array(audio_raws[i][trimval:]).astype('float'), sr=audio_samples[i].frame_rate, ax=ax[i])
-        ax[i].set(title=clips[i])
-        ax[i].label_outer()
-        for b in audio_group.beat_list[i]:
-            ax[i].axvline(x=b, color='b')
-    plt.show()
-
-    # visualize audio streams (using librosa functions)
-    audio_group.gen_plots(audio_samples, audio_raws, sync_offsets, clips)
-    if True:
-        # plot original (unaligned) onset envelope peaks
-        fig, ax = plt.subplots(nrows=len(onset_list), sharex=True, sharey=True)
-        for i in range(len(onset_list)):
-            ax[i].plot(time_list[i], onset_list[i])
-
-        # compute and plot chroma representation of clips (I notice the
-        # timescale has an odd scaling, but doesn't seem to be a factor of
-        # 2, or maybe it is, so ???)
-        chromas = []
-        fig, ax = plt.subplots(nrows=len(audio_raws), sharex=True, sharey=True)
-        for i in range(len(audio_raws)):
-            sr = audio_samples[i].frame_rate
-            trimval = int(round(sync_offsets[i] * sr / 1000))
-            chroma = librosa.feature.chroma_cqt(y=np.array(audio_raws[i][trimval:]).astype('float'),
-                                                sr=sr, hop_length=hop_length)
-            chromas.append(chroma)
-            img = librosa.display.specshow(chroma, x_axis='time',
-                                           y_axis='chroma',
-                                           hop_length=hop_length, ax=ax[i])
-            ax[i].set(title='Chroma Representation of ' + clips[i])
-        fig.colorbar(img, ax=ax)
-
-        plt.show()
-
-
+log("End of processing.", fancy=True)

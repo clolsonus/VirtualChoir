@@ -9,6 +9,8 @@ import os
 from scipy.signal import find_peaks
 from tqdm import tqdm
 
+from .logger import log
+
 hop_length = 512
 
 class SampleGroup():
@@ -212,6 +214,7 @@ class SampleGroup():
         done = False
         count = 0
         offsets = offset_matrix[0,:]
+        stds = np.zeros(offsets.shape[0])
         self.pretty_print_offset_array(offsets)
         while not done and count < 1000:
             done = True
@@ -220,15 +223,20 @@ class SampleGroup():
             for i in range(offsets.shape[0]):
                 diff_array = offsets_ss - offset_matrix[i,:]
                 median = np.median(diff_array)
-                print(diff_array)
-                print(median, np.mean(diff_array), np.std(diff_array))
+                mean = np.mean(diff_array)
+                std = np.std(diff_array)
                 offsets[i] = median
+                stds[i] = std
+                print(diff_array)
+                print(median, mean, std)
             print("count:", count)
             self.pretty_print_offset_array(offsets)
             # decide if we need to do another iteration
             for i in range(offsets.shape[0]):
                 if abs(offsets[i] - offsets_ss[i]) > 0.0005:
                     done = False
+        log("Fit deviations (indicator of fit quality):")
+        log(stds.tolist())
         # slide the solution by the median offset to keep it centered
         offsets -= np.median(offsets)
         return offsets                
@@ -277,18 +285,19 @@ class SampleGroup():
                     plt.show()
         print("offset_matrix:\n", offset_matrix)
 
+        # if False:
+        #     self.offset_list = []
+        #     for i in range(num):
+        #         diff_array = offset_matrix[0,:] - offset_matrix[i,:]
+        #         median = np.median(diff_array)
+        #         print(offset_matrix[i,:])
+        #         print(diff_array)
+        #         print(median, np.mean(diff_array), np.std(diff_array))
+        #         self.offset_list.append(median)
+        
         self.offset_list = self.mutual_offset_solver(offset_matrix).tolist()
-
-        if False:
-            self.offset_list = []
-            for i in range(num):
-                diff_array = offset_matrix[0,:] - offset_matrix[i,:]
-                median = np.median(diff_array)
-                print(offset_matrix[i,:])
-                print(diff_array)
-                print(median, np.mean(diff_array), np.std(diff_array))
-                self.offset_list.append(median)
-        print(self.offset_list)
+        log("Track offsets:", self.offset_list)
+        
         if offset_shift is None:
             #self.shift = np.max(self.offset_list)
             self.shift = 0.0

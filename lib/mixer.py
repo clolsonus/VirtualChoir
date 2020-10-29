@@ -4,6 +4,8 @@ import os
 from pydub import AudioSegment, playback  # pip install pydub
 import random
 
+from .logger import log
+
 def combine(names, samples, sync_offsets, mute_tracks,
             gain_hints={}, pan_range=0):
     durations_ms = []
@@ -11,13 +13,13 @@ def combine(names, samples, sync_offsets, mute_tracks,
         # print(names[i], len(sample) / 1000, sync_offsets[i])
         durations_ms.append( len(sample) - sync_offsets[i] )
     duration_ms = np.median(durations_ms)
-    print("median audio duration (ms):", duration_ms)
+    log("median audio duration (sec):", duration_ms / 1000)
     
     y_mixed = None
     mixed_count = 0
     for i, sample in enumerate(samples):
         if names[i] in mute_tracks:
-            print("skipping muted:", names[i])
+            log("skipping muted:", names[i])
             continue
         if os.path.basename(names[i]) in gain_hints:
             track_gain = gain_hints[os.path.basename(names[i])]
@@ -28,7 +30,8 @@ def combine(names, samples, sync_offsets, mute_tracks,
             sync_offset = 0
         else:
             sync_offset = sync_offsets[i]
-        print(" ", names[i], "offset(ms):", sync_offset, "gain:", track_gain)
+        log(" ", names[i], "offset(sec):", sync_offset/1000,
+            "gain:", track_gain)
         sample = sample.set_channels(2)
         if pan_range > 0.00001 and pan_range <= 1.0:
             sample = sample.pan( random.uniform(-pan_range, pan_range) )
@@ -62,7 +65,7 @@ def combine(names, samples, sync_offsets, mute_tracks,
                 y = np.concatenate([y, np.zeros(diff)], axis=None)
             y_mixed += (y * track_gain)
     if mixed_count < 1:
-        print("No unmuted audio tracks found.")
+        log("No unmuted audio tracks found.")
         return AudioSegment.silent(1000)
     y_mixed *= (1 / math.sqrt(mixed_count)) # balsy but good chance of working
     #y_mixed *= (1 / math.pow(mixed_count, 0.6)) # slightly more conservative
@@ -73,10 +76,10 @@ def combine(names, samples, sync_offsets, mute_tracks,
     return mixed
     
 def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
-    print("Writing aligned version of samples (padded/trimed)...")
+    log("Writing aligned version of samples (padded/trimed)...", fancy=True)
     for i, sample in enumerate(samples):
         if names[i] in mute_tracks:
-            print("skipping muted:", names[i])
+            log("skipping muted:", names[i])
             continue
         if sync_offsets is None:
             sync_offset = 0
@@ -93,6 +96,6 @@ def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
         basename = os.path.basename(names[i])
         name, ext = os.path.splitext(basename)
         output_file = os.path.join(results_dir, "aligned_" + name + ".mp3")
-        print(" ", output_file, "offset(ms):", sync_offset)
+        log(" ", output_file, "offset(sec):", sync_offset/1000)
         synced_sample.export(output_file, format="mp3")
     
