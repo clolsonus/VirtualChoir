@@ -43,3 +43,12 @@ sync your tracks from a google shared folder if you have made the
 folder visable (read-only with the link.)  Your results are shared
 back with you using [Filemail](filemail.com) and will be available for
 7 days.
+
+# Thanks!
+
+There is no way to keep a full list of everyone to thank, but for
+their invaluable help getting this project rolling, providing ideas,
+and samples to test with, thanks to:
+
+* Kathleen Hanson - Master Director, San Diego Chorus
+* Clement Cano - Vocal Arts Director, Sacred Heart Schools, Atherton CA
