@@ -2,7 +2,7 @@ import csv
 from datetime import datetime
 import json
 import os
-from subprocess import call
+import subprocess
 import time
 from zipfile import ZipFile
 
@@ -20,7 +20,7 @@ def fetch( response_url ):
         f.write(csv_data)
         f.close()
 
-def process():
+def process( settings ):
     last_time = get_last_time()
     new_time = 0
     dirty = False
@@ -36,12 +36,12 @@ def process():
                 dirty = True
                 if ts > new_time:
                     new_time = ts
-                run_job(row)
+                run_job(settings, row)
     if dirty:
         save_last_time(new_time)        
 
-def run_job(request):
-    # sync the shared google drive folder
+def run_job(settings, request):
+    # sync the shared google drive folder (create a local copy)
     url = request['Public google drive folder share link']
     gd = gdrive.gdrive()
     if "google.com" in url:
@@ -51,23 +51,36 @@ def run_job(request):
         print("aborting...")
         return
 
-    # do the thing
+    # paths management
     folder_id = gd.get_folder_id(url)
     work_dir = os.path.join(common.vcdir, "projects", folder_id)
+    results_dir = os.path.join(work_dir, "results")
+    if not os.path.exists(results_dir):
+        print("Creating:", results_dir)
+        os.makedirs(results_dir)
+    
+    audio_only = False
+    aligned_audio = False
     command = [ "./sync-tracks.py", work_dir ]
     if request['Synchronization Strategy'] == "Claps":
         command.append( "--sync" )
         command.append( "clap" )
     if len(request['Additional Options']):
         options = request['Additional Options'].split(", ")
-        if "Mute videos" in options:
-            command.append("--mute-videos")
         for o in options:
-            if o.startswith("Generate time aligned individual audio tracks"):
+            if o.startswith("Mute videos"):
+                command.append("--mute-videos")
+            elif o.startswith("Generate time aligned individual audio tracks"):
+                aligned_audio = True
                 command.append("--write-aligned-audio")
-                break
+            elif o.startswith("Only audio"):
+                audio_only = True
+                command.append("--no-video")
     print("Running command:", command)
-    call(command)
+    result = subprocess.run(command)
+    if result.returncode != 0:
+        print("Something failed processing the job.")
+        return
 
     if False:
         # zip the results
@@ -83,25 +96,33 @@ def run_job(request):
                     zip.write(full_name, arcname=file)
 
     # generate list of files
-    results_dir = os.path.join(work_dir, "results")
     send_files = []
     for file in sorted(os.listdir(results_dir)):
-        if file == "silent_video.mp4":
+        if not aligned_audio and file.startswith("aligned_"):
+            pass
+        elif file == "silent_video.mp4":
+            pass
+        elif audio_only and file == "gridded_video.mp4":
             pass
         else:
             send_files.append( os.path.join(results_dir, file) )
     print("sending files:", send_files)
     # send the results
     command = [ "./FilemailCli",
+                "--username=%s" % settings["filemail_email"],
+                "--userpassword=%s" % settings["filemail_password"],
                 "--files=%s" % ",".join(send_files),
                 "--to=%s" % request["Email Address"],
-                "--from=no-reply-virtualchoir@flightgear.org",
+                "--from=noreply-virtualchoir@flightgear.org",
                 "--subject='Your virtual choir song: " + gd.folder_name + " is ready!'",
                 "--days=7",
                 "--verbose=true" ]
     print("Running command:", command)
-    call(command)
-    
+    result = subprocess.run(command)
+    if result.returncode != 0:
+        print("Something failed sending the results.")
+        return
+
 # read the saved time
 def get_last_time():
     last_time = 0
