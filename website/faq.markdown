@@ -40,41 +40,28 @@ please be patient!
 that your job was received, see how many jobs are ahead of yours in
 the queue, and generally check on the progress of your request.)
 
-# What if something doesn't work, or the result is just a big mess!
+# What if something doesn't work or the result is just a big mess!
 
-First, don't panic, please!  Second, let me know.  If something breaks
-I need to know about it before I can look into it.  Consider part of
-the price of using the service to be helping me fix issues and make
-the service better for everyone else.
+First, we can fix it!
 
-I will create some pages here with more details, but bear in mind that
-no automated system will be perfect when dealing with human generated
-input.  There are several steps you can do to fix sync issues, adjust
-audio levels for individual tracks (like boost the levels of your
-accompaniment, or mute a track that just didn't work out.)
+Second, visit the "Next Steps" page.  No fully automatic system will
+be perfect.  You can fix some common sync issues, fix rotated videos,
+and adjust gains for individual tracks yourself.
 
-Again, don't panic, we can fix it, we can make it work!
-
-# I plan to do all the audio and video engineering myself, I have good tools and know how to use them!
-
-Yes, that's awesome.  But I know how time consuming it can be to
-manually align all your video and audio tracks.  This system has an
-option to generate new copies of all your individual audio tracks that
-are padded/trimmed so they all start at the exact same time.  You can
-import these audio tracks into your favorite software tools, line them
-all up at zero and you are good to go.  You can focus your time and
-talents on all the creative parts and skip some of the super tedious
-parts.  Just check this box on the request form.
+Third, let me know.  If something has really broke, I need to know
+about it before I can look into it.  Consider part of the price of
+using the service to be helping me fix issues and make the service
+better for everyone else.
 
 # Sounds great, how do I install the software?  What platforms are supported?
 
 This is the beauty of the automated cloud-based system.  You can use
 any device, any operating system, phones, tablets, chromebooks, pc's,
 macs.  You don't install any software at all.  You create a shared
-folder on your google drive (you do need a google account for that
-part.)  You upload all your videos to the shared folder.  Then fill
-out the online form.  That's it, just watch your email for a notice on
-how to download your video as soon as it is ready.
+folder on your google drive (you do need a google account for that.)
+You upload all your videos to the shared folder.  Then fill out the
+online form.  That's it, just watch your email for a notice on how to
+download your video as soon as it is ready.
 
 # Can I use this system for choir practice?
 
@@ -102,26 +89,28 @@ hobbyists, music schools, maybe you wish to record all your tracks
 yourself, it's all good.  Please be creative!  Please use this a tool
 to connect with others!  Please share your results!
 
-# What about privacy and ownership?
+# What about privacy and copyrights?
 
 When you create a google drive folder, you own the contents and are
 the only one who can view your tracks.
 
 You do need to allow access to your folder by creating a view only
 shared link.  The virtual choir software will read your tracks from
-your shared project folder.  You can decide who you share that shared
-folder link with (it acts like a password.)  You will need to include
-this link the submission form when you place your request, but only
-the automated system sees your shared link and the contents of your
-folder.  Your original content is never published or reshared.
+your shared project folder.  You can decide who you share that folder
+link with (it acts like a password.)  You will need to include this
+link on the submission form when you place your request, but only the
+automated system sees your shared link and the contents of your
+folder.  Your original content is never copied anywhere else or
+reshared.
 
 When your video is finished, a download link is sent to your email
 address.  This link acts like a password to access your finished
 result.  You can choose if you want to share your work with others,
 and hopefully you do!
 
-Your creative work remains your create work throughout.  You own any
-rights to the final video.
+Your creative work remains yours throughout.  You own any rights to
+your content.  Processing your work through these tools does not
+change or affect your ownership.
 
 # The system worked and the video made me smile.  Can I donate something to help support your site?
 
