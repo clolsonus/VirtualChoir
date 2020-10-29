@@ -10,6 +10,11 @@ your efforts and talents!
 
 [![Natus est Nobis](http://img.youtube.com/vi/Z_pOPgHhDyI/0.jpg)](https://www.youtube.com/watch?v=Z_pOPgHhDyI "Natus est Nobis (demo of software)")
 
+## Try it out online!
+
+You can make your own virtual choir movies using this software online
+at: [https://virtualchoir.flightgear.org](https://virtualchoir.flightgear.org)
+
 ## Basic workflow
 
 * Record a reference track for your piece.
