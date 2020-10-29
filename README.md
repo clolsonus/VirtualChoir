@@ -12,8 +12,8 @@ your efforts and talents!
 
 ## Try it out online!
 
-You can make your own virtual choir movies using this software online
-at: [https://virtualchoir.flightgear.org](https://virtualchoir.flightgear.org)
+An online version of these tools is available here:
+[https://virtualchoir.flightgear.org](https://virtualchoir.flightgear.org)
 
 ## Basic workflow
 
