@@ -296,7 +296,7 @@ class SampleGroup():
         #         self.offset_list.append(median)
         
         self.offset_list = self.mutual_offset_solver(offset_matrix).tolist()
-        log("Track offsets:", self.offset_list)
+        log("Track time offsets (sec):", self.offset_list)
         
         if offset_shift is None:
             #self.shift = np.max(self.offset_list)
