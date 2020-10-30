@@ -36,7 +36,10 @@ def process( settings ):
                 dirty = True
                 if ts > new_time:
                     new_time = ts
-                run_job(settings, row)
+                result = run_job(settings, row)
+                if not result:
+                    print("Error processing job, sorry dying for now ...")
+                    quit()
     if dirty:
         save_last_time(new_time)        
 
@@ -49,7 +52,7 @@ def run_job(settings, request):
     else:
         print("this doesn't look like a google drive url.")
         print("aborting...")
-        return
+        return False
 
     # paths management
     folder_id = gd.get_folder_id(url)
@@ -80,7 +83,7 @@ def run_job(settings, request):
     result = subprocess.run(command)
     if result.returncode != 0:
         print("Something failed processing the job.")
-        return
+        return False
 
     if False:
         # zip the results
@@ -121,7 +124,10 @@ def run_job(settings, request):
     result = subprocess.run(command)
     if result.returncode != 0:
         print("Something failed sending the results.")
-        return
+        return False
+
+    # all good if we made it here
+    return True
 
 # read the saved time
 def get_last_time():
