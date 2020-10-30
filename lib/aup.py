@@ -1,6 +1,8 @@
 import lxml.etree as ET
 import os
 
+from .logger import log
+
 # keep in mind:
 
 # (1) Audacity imports the original sample and keeps it's own copy
@@ -22,12 +24,12 @@ def sanity_check(audio_tracks):
             base2, ext2 = os.path.splitext(tail2)
             if base1 == base2:
                 ok = False
-                print("Caution: multiple files have same root name.")
-                print("    -->", audio_tracks[i])
-                print("    -->", audio_tracks[j])
-                print("    If you are using audacity to fix sync:")
-                print("    Do not change any track ordering in your folder layout or audacity ...")
-                print("    or you could get really strange sync issues!")
+                log("Caution: multiple files have same root name.")
+                log("    -->", audio_tracks[i])
+                log("    -->", audio_tracks[j])
+                #log("    If you are using audacity to fix sync:")
+                #log("    Do not change any track ordering in your folder layout or audacity ...")
+                #log("    or you could get really strange sync issues!")
     return ok
             
 def offsets_from_aup(audio_tracks, audio_samples, dir, file):
@@ -54,13 +56,13 @@ def offsets_from_aup(audio_tracks, audio_samples, dir, file):
             if name.startswith(basename + "."):
                 print("possible match:", name, len(audio_samples[i])/1000, length)
                 if abs(len(audio_samples[i])/1000 - length) < 0.1:
-                    print("  match:", name, len(audio_samples[i])/1000, length)
+                    log("  match:", name, len(audio_samples[i])/1000, length)
                     sync_offsets[i] = -offset * 1000 # ms
     # check for any missing offsets
     for i, name in enumerate(audio_tracks):
         if sync_offsets[i] is None:
-            print("Warning, no sync value found for:", name)
-            print("  Setting default sync time offset to 0.0")
+            log("Warning, no sync value found for:", name)
+            log("  Setting default sync time offset to 0.0")
             sync_offsets[i] = 0.0
     print(sync_offsets)
     return sync_offsets
