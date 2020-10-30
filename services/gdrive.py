@@ -10,6 +10,7 @@ import time
 # great info here, including setting yourself up with a credentials.json file:
 # https://developers.google.com/drive/api/v3/quickstart/python
 
+# pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -49,8 +50,17 @@ class gdrive():
 
     def get_folder_id(self, url):
         tmp1 = url.split('/')
-        tmp2 = tmp1[-1].split('?')
-        folder_id = tmp2[0]
+        parts = tmp1[-1].split('?')
+        folder_id = None
+        for p in parts:
+            if p.startswith("usp=") or p == "folderview":
+                pass
+            elif p.startswith("id="):
+                folder_id = p[3:]
+                break
+            else:
+                folder_id = p
+                break
         print('folder_id:', folder_id)
         return folder_id
 
@@ -93,6 +103,7 @@ class gdrive():
             os.makedirs(project_dir)
 
         # Get shared folder details
+        print("folder id:", folder_id)
         results = self.service.files().get(fileId=folder_id, fields='*').execute()
         print("results:", results)
         if "name" in results:
