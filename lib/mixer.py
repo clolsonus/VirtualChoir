@@ -48,8 +48,7 @@ def combine(names, samples, sync_offsets, mute_tracks,
         synced_sample = synced_sample.fade_out(1000)
         
         y = np.array(synced_sample.get_array_of_samples()).astype('double')
-        #if sample.channels == 2:
-        #    y = y.reshape((-1, 2))
+        print(i, "max:", np.max(y))
         #print(" ", y.shape)
         if y_mixed is None:
             y_mixed = y
@@ -67,9 +66,15 @@ def combine(names, samples, sync_offsets, mute_tracks,
     if mixed_count < 1:
         log("No unmuted audio tracks found.")
         return AudioSegment.silent(1000)
-    y_mixed *= (1 / math.sqrt(mixed_count)) # balsy but good chance of working
-    #y_mixed *= (1 / math.pow(mixed_count, 0.6)) # slightly more conservative
-    #y_mixed *= (1 / len(mixed_count)) # very conservative output levels
+    print("total max:", np.max(y_mixed))
+    min_div = np.max(y_mixed) / 32767
+    if math.sqrt(mixed_count) > min_div:
+        # balsy but good chance of working
+        y_mixed /= math.sqrt(mixed_count)
+    else:
+        y_mixed /= min_div
+    #y_mixed /= math.pow(mixed_count, 0.6) # slightly more conservative
+    #y_mixed / len(mixed_count) # very conservative output levels
     y_mixed = np.int16(y_mixed)
     mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
     mixed.normalize()
@@ -96,6 +101,6 @@ def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
         basename = os.path.basename(names[i])
         name, ext = os.path.splitext(basename)
         output_file = os.path.join(results_dir, "aligned_" + name + ".mp3")
-        log(" ", output_file, "offset(sec):", sync_offset/1000)
+        log(" ", "aligned_" + name + ".mp3", "offset(sec):", sync_offset/1000)
         synced_sample.export(output_file, format="mp3")
     
