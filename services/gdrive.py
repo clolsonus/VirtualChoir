@@ -146,7 +146,7 @@ class gdrive():
                 # recurse folders
                 newurl = "https://drive.google.com/drive/folders/" + item['id']
                 newpath = os.path.join(work_dir, item['name'])
-                sync_folder(newurl, newpath)
+                self.sync_folder(newurl, newpath)
             else:
                 # fetch file
                 name = self.fix_extension(item['name'], item['mimeType'])
