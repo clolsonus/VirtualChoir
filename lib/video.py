@@ -7,6 +7,8 @@ import skvideo.io               # pip install sk-video
 from subprocess import call
 from tqdm import tqdm
 
+from .logger import log
+
 class VideoTrack:
     def __init__(self):
         self.reader = None
@@ -93,9 +95,11 @@ def render_combined_video(project, results_dir,
     output_h = 1080
     output_fps = 30
     border = 10
-
+    log("output video specs:", output_w, "x", output_h, "fps:", output_fps)
+    
     # load static pages if specified
     if title_page:
+        log("adding a title page:", title_page)
         title_rgb = cv2.imread(os.path.join(project, title_page),
                                flags=cv2.IMREAD_ANYCOLOR|cv2.IMREAD_ANYDEPTH)
         title_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
@@ -117,6 +121,7 @@ def render_combined_video(project, results_dir,
         
     credits_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
     if credits_page:
+        log("adding a credits page:", credits_page)
         credits_rgb = cv2.imread(os.path.join(project, credits_page),
                                  flags=cv2.IMREAD_ANYCOLOR|cv2.IMREAD_ANYDEPTH)
         (h, w) = credits_rgb.shape[:2]
@@ -146,7 +151,7 @@ def render_combined_video(project, results_dir,
             durations.append(v.duration + offsets[i])
     duration = np.median(durations)
     duration += 4 # for credits/fade out
-    print("median video duration (with fade to credits):", duration)
+    log("median video duration (with fade to credits):", duration)
     
     if len(videos) == 0:
         return
@@ -164,6 +169,9 @@ def render_combined_video(project, results_dir,
     landscape = True
     if num_portrait > num_landscape:
         landscape = False
+        log("portrait dominant input videos")
+    else:
+        log("landscape dominant input videos")
 
     cols = 1
     rows = 1
@@ -178,7 +186,7 @@ def render_combined_video(project, results_dir,
                 cols += 1
             else:
                 rows += 1
-    print("video grid:", cols, "x", rows)
+    log("video grid (rows x cols):", rows, "x", cols)
     grid_w = int(output_w / cols)
     grid_h = int(output_h / rows)
     cell_w = (output_w - border*(cols+1)) / cols
@@ -309,8 +317,10 @@ def render_combined_video(project, results_dir,
         pbar.update(1)
     pbar.close()
     writer.close()
-
+    log("gridded video (only) file: silent_video.mp4")
+    
 def merge(results_dir):
+    log("video: merging video and audio into final result: gridded_video.mp4")
     # use ffmpeg to combine the video and audio tracks into the final movie
     input_video = os.path.join(results_dir, "silent_video.mp4")
     input_audio = os.path.join(results_dir, "mixed_audio.mp3")
