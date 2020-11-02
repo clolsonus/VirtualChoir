@@ -96,9 +96,9 @@ the only one who can view your tracks.
 
 You do need to allow access to your folder by creating a view only
 shared link.  The virtual choir software will read your tracks from
-your shared project folder.  You can decide who you share that folder
-link with (it acts like a password.)  You will need to include this
-link on the submission form when you place your request, but only the
+your google folder.  You can decide who you share that folder link
+with (it acts like a password.)  You will need to include this link on
+the submission form when you place your request, but only the
 automated system sees your shared link and the contents of your
 folder.  Your original content is never copied anywhere else or
 reshared.

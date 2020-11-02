@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Demo Video"
+title:  "Demo Video - Natus est Nobis"
 date:   2020-10-28 11:19:13 -0500
 categories: demo
 ---
@@ -11,7 +11,7 @@ this software.
 
 # Natus est Nobis - the introit for Christmas Day.
 
-[![Natus est Nobis](http://img.youtube.com/vi/Z_pOPgHhDyI/0.jpg)](https://www.youtube.com/watch?v=Z_pOPgHhDyI "Natus est Nobis (demo of software)")
+[![Natus est Nobis](http://img.youtube.com/vi/Z_pOPgHhDyI/0.jpg)](https://www.youtube.com/watch?v=Z_pOPgHhDyI "Natus est Nobis (demo of software)"){:target="_blank"}
 
 This video including title page and credits page was 100%
 automatically created by the Virtual Choir Maker software in less than

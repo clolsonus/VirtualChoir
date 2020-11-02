@@ -2,12 +2,14 @@
 # Feel free to add content and custom Front Matter to this file.
 # To modify the layout, see https://jekyllrb.com/docs/themes/#overriding-theme-defaults
 
-layout: page
+layout: home
 ---
 
 <script data-ad-client="ca-pub-2485404446552133" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
 
 # Let your voice soar!
+
+Autosyncs all your tracks - mixes your audio - produces a gridded video.
 
 ## Make your own virtual choir videos in 3 easy steps
 

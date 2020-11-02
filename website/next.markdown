@@ -56,7 +56,7 @@ one track (and one hint) per line.  For example:
 ```
 Valid rotations are 90, 180, and 270 in the clockwise direction.
 
-# The automatic video grid system is great, but I need the videos laid out in order.
+# The automatic video grid system is great, but I need the videos laid out in a different order.
 
 The gridded video system draws the tracks in alphabetical order.  So
 you can go back and adjust the names of your tracks.  For example:
