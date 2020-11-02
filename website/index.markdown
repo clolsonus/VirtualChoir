@@ -9,7 +9,7 @@ layout: home
 
 # Let your voice soar!
 
-Autosyncs all your tracks - mixes your audio - produces a gridded video.
+Autosync your tracks - mix your audio - produce a gridded video.
 
 ## Make your own virtual choir videos in 3 easy steps
 
