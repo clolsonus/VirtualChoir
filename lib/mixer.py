@@ -14,7 +14,19 @@ def combine(names, samples, sync_offsets, mute_tracks,
         durations_ms.append( len(sample) - sync_offsets[i] )
     duration_ms = np.median(durations_ms)
     log("median audio duration (sec):", duration_ms / 1000)
-    
+
+    # auto mute reference tracks, but include accompaniment
+    for name in names:
+        print("checking:", name)
+        if name in mute_tracks:
+            # already muted
+            pass
+        elif "accompaniment" in name.lower():
+            # let it through if it has accompaniment in name
+            pass
+        elif "reference" in name.lower():
+            mute_tracks.append(name)
+                
     y_mixed = None
     mixed_count = 0
     for i, sample in enumerate(samples):
@@ -87,12 +99,11 @@ def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
             log("skipping muted:", names[i])
             continue
         if sync_offsets is None:
-            sync_offset = 0
+            sync_ms = 0
         else:
-            sync_offset = sync_offsets[i]
+            sync_ms = sync_offsets[i]
         sample = sample.set_channels(2)
         sr = sample.frame_rate
-        sync_ms = sync_offset
         if sync_ms >= 0:
             synced_sample = sample[sync_ms:]
         else:
@@ -100,7 +111,7 @@ def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
             synced_sample = pad + sample
         basename = os.path.basename(names[i])
         name, ext = os.path.splitext(basename)
-        output_file = os.path.join(results_dir, "aligned_" + name + ".mp3")
-        log(" ", "aligned_" + name + ".mp3", "offset(sec):", sync_offset/1000)
+        output_file = os.path.join(results_dir, "aligned_audio_" + name + ".mp3")
+        log(" ", "aligned_audio_" + name + ".mp3", "offset(sec):", sync_ms/1000)
         synced_sample.export(output_file, format="mp3")
     
