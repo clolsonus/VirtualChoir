@@ -24,8 +24,7 @@ parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
 parser.add_argument('--reference', help='file name of declared refrence track')
 parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
 parser.add_argument('--no-video', action='store_true', help='skip the video production.')
-parser.add_argument('--write-aligned-audio', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
-parser.add_argument('--write-aligned-video', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
+parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
 
 args = parser.parse_args()
 
@@ -225,14 +224,14 @@ group_file = os.path.join(results_dir, "mixed_audio.mp3")
 log("Mixed audio file: mixed_audio.mp3")
 mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 
-if args.write_aligned_audio:
-    log("Generating trim/padded tracks that all start together.")
+if args.write_aligned_tracks:
+    log("Generating trimmed/padded tracks that start at a common aligned time.")
     # write trimmed/padded samples for 'easy' alignment
     mixer.save_aligned(results_dir, audio_tracks, audio_samples, sync_offsets,
                        mute_tracks)
 
 if len(video_tracks) and not args.no_video:
-    log("Generate gridded video", fancy=True)
+    log("Generating gridded video", fancy=True)
     video_offsets = []
     for track in video_tracks:
         ai = audio_tracks.index(track)
@@ -245,6 +244,10 @@ if len(video_tracks) and not args.no_video:
                                  title_page=title_page,
                                  credits_page=credits_page )
     video.merge( results_dir )
+    if args.write_aligned_tracks:
+        log("Generating trimmed/padded tracks that start at a common aligned time.")
+        video.save_aligned(args.project, results_dir, video_tracks, sync_offsets)
+    
 else:
     log("No video tracks, or audio-only requested.")
 
