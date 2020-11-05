@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 import os
 import subprocess
+import tempfile
 import time
 from zipfile import ZipFile
 
@@ -28,6 +29,7 @@ def process( settings ):
     with open(csvfile, 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
+            print("row:", row)
             timestamp = row['Timestamp']
             dt = datetime.strptime(timestamp, '%m/%d/%Y %H:%M:%S')
             ts = time.mktime(dt.timetuple())
@@ -38,20 +40,84 @@ def process( settings ):
                     new_time = ts
                 result = run_job(settings, row)
                 if not result:
-                    print("Error processing job, sorry dying for now ...")
-                    quit()
+                    print("Error processing job, sorry ...")
     if dirty:
         save_last_time(new_time)        
+
+def send_results(settings, request, subject, file_list):
+    # send the results
+    command = [ "./FilemailCli",
+                "--username=%s" % settings["filemail_email"],
+                "--userpassword=%s" % settings["filemail_password"],
+                "--files=%s" % ",".join(file_list),
+                "--to=%s" % request["Email Address"],
+                "--from=noreply-virtualchoir@flightgear.org",
+                "--subject=%s" % subject,
+                "--days=7",
+                "--verbose=true" ]
+    print("Running command:", command)
+    result = subprocess.run(command)
+    if result.returncode != 0:
+        print("Something failed sending the results.")
+        return False
+    return True
+    
+# return a folder sync error
+def gen_sync_error(settings, request):
+    (fd, name) = tempfile.mkstemp(suffix=".txt", prefix="error-report-")
+    with os.fdopen(fd, 'w') as tmp:
+        tmp.write("Virtual Choir Maker ran into a problem with your request.\n")
+        tmp.write("We could not sync the shared google folder you listed:\n")
+        tmp.write("\n")
+        tmp.write("    " + request['Public google drive folder share link'] + "\n")
+        tmp.write("\n")
+        tmp.write("Please check that you created a shared link to this folder\n")
+        tmp.write("and that you shared the folder outside your organization (if applicable.)\n")
+        tmp.write("\n")
+        tmp.write("Then go ahead and resubmit your request.\n")
+        tmp.write("\n")
+    subject = "'Your virtual choir maker request ran into a problem.  Please download the error report for more details.'"
+    result = send_results(settings, request, subject, [name])
+    os.unlink(name)
+    if not result:
+        return False
+    return True
+
+def gen_form_error(settings, request):
+    (fd, name) = tempfile.mkstemp(suffix=".txt", prefix="error-report-")
+    with os.fdopen(fd, 'w') as tmp:
+        tmp.write("Virtual Choir Maker ran into a problem with your request.\n")
+        tmp.write("The google folder link you shared does not appear to be a valid google drive link:\n")
+        tmp.write("\n")
+        tmp.write("    " + request['Public google drive folder share link'] + "\n")
+        tmp.write("\n")
+        tmp.write("Please check that you created a shared link to this folder\n")
+        tmp.write("and that you shared the folder outside your organization (if applicable.)\n")
+        tmp.write("Please double check you have copied the link correctly.\n")
+        tmp.write("\n")
+        tmp.write("Then go ahead and resubmit your request.\n")
+        tmp.write("\n")
+    subject = "'Your virtual choir maker request ran into a problem.  Please download the error report for more details.'"
+    result = send_results(settings, request, subject, [name])
+    os.unlink(name)
+    if not result:
+        return False
+    return True
 
 def run_job(settings, request):
     # sync the shared google drive folder (create a local copy)
     url = request['Public google drive folder share link']
-    gd = gdrive.gdrive()
-    if "google.com" in url:
-        gd.sync_folder(url)
-    else:
+    if not "google.com" in url:
         print("this doesn't look like a google drive url.")
         print("aborting...")
+        gen_form_error(settings, request)
+        return False
+    
+    gd = gdrive.gdrive()
+    result = gd.sync_folder(url)
+    if not result:
+        print("sync failed, permissions or url?")
+        gen_sync_error(settings, request)
         return False
 
     # paths management
@@ -63,7 +129,7 @@ def run_job(settings, request):
         os.makedirs(results_dir)
     
     audio_only = False
-    aligned_audio = False
+    aligned_tracks = False
     command = [ "./sync-tracks.py", work_dir ]
     if request['Synchronization Strategy'] == "Claps":
         command.append( "--sync" )
@@ -73,9 +139,9 @@ def run_job(settings, request):
         for o in options:
             if o.startswith("Mute videos"):
                 command.append("--mute-videos")
-            elif o.startswith("Generate time aligned individual audio tracks"):
-                aligned_audio = True
-                command.append("--write-aligned-audio")
+            elif o.startswith("Make individual time aligned tracks"):
+                aligned_tracks = True
+                command.append("--write-aligned-tracks")
             elif o.startswith("Only audio"):
                 audio_only = True
                 command.append("--no-video")
@@ -99,34 +165,24 @@ def run_job(settings, request):
                     zip.write(full_name, arcname=file)
 
     # generate list of files
-    send_files = []
+    file_list = []
     for file in sorted(os.listdir(results_dir)):
-        if not aligned_audio and file.startswith("aligned_"):
+        if not aligned_tracks and file.startswith("aligned_"):
             pass
         elif file == "silent_video.mp4":
             pass
         elif audio_only and file == "gridded_video.mp4":
             pass
         else:
-            send_files.append( os.path.join(results_dir, file) )
-    print("sending files:", send_files)
-    # send the results
-    command = [ "./FilemailCli",
-                "--username=%s" % settings["filemail_email"],
-                "--userpassword=%s" % settings["filemail_password"],
-                "--files=%s" % ",".join(send_files),
-                "--to=%s" % request["Email Address"],
-                "--from=noreply-virtualchoir@flightgear.org",
-                "--subject='Your virtual choir song: " + gd.folder_name + " is ready!'",
-                "--days=7",
-                "--verbose=true" ]
-    print("Running command:", command)
-    result = subprocess.run(command)
-    if result.returncode != 0:
-        print("Something failed sending the results.")
+            file_list.append( os.path.join(results_dir, file) )
+    print("sending files:", file_list)
+    subject = "'Your virtual choir song: " + gd.folder_name + " is ready!'"
+    result = send_results(settings, request, subject, file_list)
+    if not result:
         return False
-
+    
     # all good if we made it here
+    print("Success!")
     return True
 
 # read the saved time
