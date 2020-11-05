@@ -50,5 +50,5 @@ There is no way to keep a full list of everyone to thank, but for
 their invaluable help getting this project rolling, providing ideas,
 and samples to test with, many many thanks to:
 
-* Kathleen Hanson - Master Director, San Diego Chorus
+* Kathleen Hansen - Master Director, San Diego Chorus
 * Clement Cano - Vocal Arts Director, Sacred Heart Schools, Atherton CA
