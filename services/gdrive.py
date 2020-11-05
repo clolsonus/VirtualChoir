@@ -104,9 +104,13 @@ class gdrive():
 
         # Get shared folder details
         print("folder id:", folder_id)
-        results = self.service.files().get(fileId=folder_id, fields='*').execute()
+        try:
+            results = self.service.files().get(fileId=folder_id, fields='*').execute()
+        except:
+            print("Folder not found, check path and check it is shared outside your organization")
+            return False
         print("results:", results)
-        if "name" in results:
+        if "name" in results and not self.folder_name:
             self.folder_name = results["name"]
         else:
             self.folder_name = folder_id
