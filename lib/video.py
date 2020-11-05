@@ -3,11 +3,36 @@ import json
 import math
 import numpy as np
 import os
+from pydub import AudioSegment
 import skvideo.io               # pip install sk-video
 from subprocess import call
 from tqdm import tqdm
 
 from .logger import log
+
+def gen_dicts(fps, quality="sane"):
+    inputdict = {
+        '-r': str(fps)
+    }
+    if quality == "sane":
+        outputdict = {
+            # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
+            '-vcodec': 'libx264',  # use the h.264 codec
+            '-pix_fmt': 'yuv420p', # support 'dumb' players
+            '-crf': '17',          # visually lossless (or nearly so)
+            '-preset': 'medium',   # default compression
+            '-r': str(fps)         # fps
+        }
+    elif quality == "lossless":
+        outputdict = {
+            # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
+            '-vcodec': 'libx264',  # use the h.264 codec
+            '-pix_fmt': 'yuv420p', # support 'dumb' players
+            '-crf': '0',           # set the constant rate factor to 0, (lossless)
+            '-preset': 'veryslow', # maximum compression
+            '-r': str(fps)         # fps
+        }
+    return inputdict, outputdict
 
 class VideoTrack:
     def __init__(self):
@@ -81,10 +106,6 @@ class VideoTrack:
         frame = frame[:,:,::-1]     # convert from RGB to BGR (to make opencv happy)
         return frame
 
-#
-# work on generating video early for testing purposes
-#
-# fixme: need to consider portrait video aspect ratios
 # fixme: figure out why zooming on some landscape videos in some cases
 #        doesn't always fill the grid cell (see Coeur, individual grades.) 
 def render_combined_video(project, results_dir,
@@ -140,18 +161,22 @@ def render_combined_video(project, results_dir,
         credits_frame[y:y+credits_scale.shape[0],x:x+credits_scale.shape[1]] = credits_scale
         #cv2.imshow("credits", credits_frame)
 
-    # open all video clips and advance to clap sync point
+    # open all the video clips and grab some quick stats
     videos = []
     durations = []
+    areas = []
     for i, file in enumerate(video_names):
         v = VideoTrack()
         path = os.path.join(project, file)
         if v.open(path):
             videos.append(v)
             durations.append(v.duration + offsets[i])
+            areas.append(v.frame.shape[0] * v.frame.shape[1])
     duration = np.median(durations)
     duration += 4 # for credits/fade out
     log("median video duration (with fade to credits):", duration)
+    median_area = np.median(areas)
+    log("median area (for rough sizing):", median_area)
     
     if len(videos) == 0:
         return
@@ -196,27 +221,9 @@ def render_combined_video(project, results_dir,
     print("  cell size:", cell_w, "x", cell_h, "aspect:", cell_aspect)
     
     # open writer for output
-    inputdict = {
-        '-r': str(output_fps)
-    }
-    lossless = {
-        # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
-        '-vcodec': 'libx264',  # use the h.264 codec
-        '-pix_fmt': 'yuv420p', # support 'dumb' players
-        '-crf': '0',           # set the constant rate factor to 0, (lossless)
-        '-preset': 'veryslow', # maximum compression
-        '-r': str(output_fps)  # match input fps
-    }
-    sane = {
-        # See all options: https://trac.ffmpeg.org/wiki/Encode/H.264
-        '-vcodec': 'libx264',  # use the h.264 codec
-        '-pix_fmt': 'yuv420p', # support 'dumb' players
-        '-crf': '17',          # visually lossless (or nearly so)
-        '-preset': 'medium',   # default compression
-        '-r': str(output_fps)  # match input fps
-    }
     output_file = os.path.join(results_dir, "silent_video.mp4")
-    writer = skvideo.io.FFmpegWriter(output_file, inputdict=inputdict, outputdict=sane)
+    inputdict, outputdict = gen_dicts(output_fps, "sane")
+    writer = skvideo.io.FFmpegWriter(output_file, inputdict=inputdict, outputdict=outputdict)
     done = False
     frames = [None] * len(videos)
     output_time = 0
@@ -312,7 +319,9 @@ def render_combined_video(project, results_dir,
         cv2.imshow("output", output_frame)
         cv2.waitKey(1)
 
-        writer.writeFrame(output_frame[:,:,::-1])  #write the frame as RGB not BGR
+        # write the frame as RGB not BGR
+        writer.writeFrame(output_frame[:,:,::-1])
+        
         output_time += 1 / output_fps
         pbar.update(1)
     pbar.close()
@@ -334,10 +343,104 @@ def merge(results_dir):
 
 #ffmpeg -f lavfi -i color=c=black:s=1920x1080:r=25:d=1 -i testa444.mov -filter_complex "[0:v] trim=start_frame=1:end_frame=5 [blackstart]; [0:v] trim=start_frame=1:end_frame=3 [blackend]; [blackstart] [1:v] [blackend] concat=n=3:v=1:a=0[out]" -map "[out]" -c:v qtrle -c:a copy -timecode 01:00:00:00 test16.mov
 
-def trim_videos(project, video_names, offsets):
-    for video in video_names:
-        input_file = os.path.join(project, video)
-        head, tail = os.path.split(input_file)
-        output_file = os.path.join(head, "aligned" + tail)
-        result = call(["ffmpeg", "-i", input_video, "-ss", offsets[i],
-                       "-vcodec", "libx264", "-acodec", "copy", output_file])
+def save_aligned(project, results_dir, video_names, sync_offsets):
+    log("Writing aligned version of videos...", fancy=True)
+    for i, video in enumerate(video_names):
+        video_file = os.path.join(project, video)
+        # decide trim/pad
+        sync_ms = sync_offsets[i]
+        if sync_ms >= 0:
+            trim_sec = sync_ms / 1000
+            pad_sec = 0
+        else:
+            trim_sec = 0
+            pad_sec = -sync_ms / 1000
+        
+        # scan video meta data for resolution/fps
+        metadata = skvideo.io.ffprobe(video_file)
+        #print(metadata.keys())
+        if not "video" in metadata:
+            log("No video frames found in:", video_file)
+            continue
+        #print(json.dumps(metadata["video"], indent=4))
+        fps_string = metadata['video']['@r_frame_rate']
+        (num, den) = fps_string.split('/')
+        fps = float(num) / float(den)
+        codec = metadata['video']['@codec_long_name']
+        w = int(metadata['video']['@width'])
+        h = int(metadata['video']['@height'])
+        duration = float(metadata['video']['@duration'])
+        total_frames = int(round(duration * fps))
+        frame_counter = -1
+
+        # pathfoo
+        basename = os.path.basename(video)
+        name, ext = os.path.splitext(basename)
+        tmp_video = os.path.join(results_dir, "tmp_video.mp4")
+        tmp_audio = os.path.join(results_dir, "tmp_audio.mp3")
+        output_file = os.path.join(results_dir, "aligned_video_" + name + ".mp4")
+        log("aligned_video_" + name + ".mp4", "offset(sec):", sync_ms/1000)
+        log("  fps:", fps, "codec:", codec, "size:", w, "x", h, "total frames:", total_frames)
+
+        # open source
+        reader = skvideo.io.FFmpegReader(video_file, inputdict={}, outputdict={})
+        
+        # open destination
+        inputdict, outputdict = gen_dicts(fps, "sane")
+        writer = skvideo.io.FFmpegWriter(tmp_video, inputdict=inputdict, outputdict=outputdict)
+
+        # pad or trim
+        pad_frames = 0
+        if pad_sec > 0:
+            pad_frames = int(round(fps*pad_sec))
+            log("  pad (sec):", pad_sec, "frames:", pad_frames)
+                
+        trim_frames = 0
+        if trim_sec > 0:
+            trim_frames = int(round(fps*trim_sec))
+            log("  trim (sec):", trim_sec, "frames:", trim_frames)
+            for i in range(trim_frames):
+                reader._readFrame() # discard
+
+        # copy remainder of video
+        pbar = tqdm(total=(total_frames+pad_frames-trim_frames), smoothing=0.1)
+        while True:
+            try:
+                frame = reader._readFrame()
+                if not len(frame):
+                    frame = None
+            except:
+                frame = None
+            if frame is None:
+                break
+            else:
+                while pad_frames:
+                    black = frame * 0
+                    writer.writeFrame(black)
+                    pad_frames -= 1
+                    pbar.update(1)
+                writer.writeFrame(frame)
+                pbar.update(1)
+        writer.close()
+        pbar.close()
+
+        # load the audio (ignoring we already have it loaded somewhere else)
+        basename, ext = os.path.splitext(video_file)
+        sample = AudioSegment.from_file(video_file, ext[1:])
+        if sync_ms >= 0:
+            synced_sample = sample[sync_ms:]
+        else:
+            pad = AudioSegment.silent(duration=-sync_ms)
+            synced_sample = pad + sample
+        synced_sample.export(tmp_audio, format="mp3")
+        
+        log("video: merging aligned video and audio into final result:", output_file)
+        # use ffmpeg to combine the video and audio tracks into the final movie
+        input_video = os.path.join(results_dir, "tmp_video.mp4")
+        input_audio = os.path.join(results_dir, "tmp_audio.mp3")
+        result = call(["ffmpeg", "-i", input_video, "-i", input_audio, "-c:v", "copy", "-c:a", "aac", "-y", output_file])
+        print("ffmpeg result code:", result)
+
+        # clean up
+        os.unlink(input_audio)
+        os.unlink(input_video)
