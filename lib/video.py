@@ -48,10 +48,20 @@ class VideoTrack:
         fps_string = metadata['video']['@r_frame_rate']
         (num, den) = fps_string.split('/')
         self.fps = float(num) / float(den)
+        if self.fps < 1 or self.fps > 120:
+            # something crazy happened let's try something else
+            fps_string = metadata['video']['@avg_frame_rate']
+            (num, den) = fps_string.split('/')
+            self.fps = float(num) / float(den)
+
+        self.fps = float(num) / float(den)
         codec = metadata['video']['@codec_long_name']
         self.w = int(metadata['video']['@width'])
         self.h = int(metadata['video']['@height'])
-        self.duration = float(metadata['video']['@duration'])
+        if '@duration' in metadata['video']:
+            self.duration = float(metadata['video']['@duration'])
+        else:
+            self.duration = 1
         self.total_frames = int(round(self.duration * self.fps))
         self.frame_counter = -1
         self.frame = []
@@ -64,6 +74,8 @@ class VideoTrack:
         print("Opening ", file)
         self.reader = skvideo.io.FFmpegReader(file, inputdict={}, outputdict={})
         self.get_frame(0.0)     # read first frame
+        if self.frame is None:
+            log("warning: no first frame in:", file)
         return True
 
     def get_frame(self, time):
@@ -191,9 +203,9 @@ def render_combined_video(project, results_dir,
                 num_landscape += 1
             else:
                 num_portrait += 1
-    landscape = True
+    cell_landscape = True
     if num_portrait > num_landscape:
-        landscape = False
+        cell_landscape = False
         log("portrait dominant input videos")
     else:
         log("landscape dominant input videos")
@@ -201,7 +213,7 @@ def render_combined_video(project, results_dir,
     cols = 1
     rows = 1
     while cols * rows < len(videos):
-        if landscape:
+        if cell_landscape:
             if cols <= rows:
                 cols += 1
             else:
@@ -227,7 +239,7 @@ def render_combined_video(project, results_dir,
     done = False
     frames = [None] * len(videos)
     output_time = 0
-    pbar = tqdm(total=int(duration*output_fps), smoothing=0.1)
+    pbar = tqdm(total=int(duration*output_fps), smoothing=0.05)
     while output_time <= duration:
         for i, v in enumerate(videos):
             frame = v.get_frame(output_time - offsets[i])
@@ -246,9 +258,11 @@ def render_combined_video(project, results_dir,
                     else:
                         print("unhandled rotation angle:", rotate_hints[video_names[i]])
                 (h, w) = frame.shape[:2]
-                aspect = w/h
+                vid_aspect = w/h
+                vid_landscape = (vid_aspect >= 1)
                 scale_w = cell_w / w
                 scale_h = cell_h / h
+                
                 #option = "fit"
                 option = "zoom"
                 if option == "fit":
@@ -262,25 +276,44 @@ def render_combined_video(project, results_dir,
                                                  interpolation=cv2.INTER_AREA)
                     frames[i] = frame_scale
                 elif option == "zoom":
+                    if cell_landscape != vid_landscape:
+                        # compromise zoom/fit/arrangement
+                        avg = (scale_w + scale_h) * 0.5
+                        scale_w = avg
+                        scale_h = avg
+                        #print("scale:", scale_w, scale_h)
                     if scale_w < scale_h:
                         frame_scale = cv2.resize(frame, (0,0), fx=scale_h,
                                                  fy=scale_h,
                                                  interpolation=cv2.INTER_AREA)
-                        (tmp_h, tmp_w) = frame_scale.shape[:2]
-                        cut = int((tmp_w - cell_w) * 0.5)
-                        frame_scale = frame_scale[:,cut:cut+int(round(cell_w))]
+                        #(tmp_h, tmp_w) = frame_scale.shape[:2]
+                        #cut = int((tmp_w - cell_w) * 0.5)
+                        #frame_scale = frame_scale[:,cut:cut+int(round(cell_w))]
                     else:
                         frame_scale = cv2.resize(frame, (0,0), fx=scale_w,
                                                  fy=scale_w,
                                                  interpolation=cv2.INTER_AREA)
-                        (tmp_h, tmp_w) = frame_scale.shape[:2]
-                        cut = int((tmp_h - cell_h) * 0.5)
-                        frame_scale = frame_scale[cut:cut+int(round(cell_h)),:]
+                    (tmp_h, tmp_w) = frame_scale.shape[:2]
+                    if tmp_h > cell_h:
+                        cuth = int((tmp_h - cell_h) * 0.5)
+                    else:
+                        cuth = 0
+                    if tmp_w > cell_w:
+                        cutw = int((tmp_w - cell_w) * 0.5)
+                    else:
+                        cutw = 0
+                    frame_scale = frame_scale[cuth:cuth+int(round(cell_h)),cutw:cutw+int(round(cell_w))]
+                    #if cell_landscape != vid_landscape:
+                    #    print("scaled size h x w:", tmp_h, tmp_w)
+                    #    print("cropped size:", frame_scale.shape[:2])
                     frames[i] = frame_scale
                 # cv2.imshow(video_names[i], frame_scale)
-            else:
+            elif not frames[i] is None:
                 # fade
                 frames[i] = (frames[i] * 0.9).astype('uint8')
+            else:
+                # bummer video with no frames?
+                pass
         main_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
 
         row = 0
@@ -289,6 +322,12 @@ def render_combined_video(project, results_dir,
             if not f is None:
                 x = int(round(border + col * (cell_w + border)))
                 y = int(round(border + row * (cell_h + border)))
+                if f.shape[1] < cell_w:
+                    gap = (cell_w - f.shape[1]) * 0.5
+                    x += int(gap)
+                if f.shape[0] < cell_h:
+                    gap = (cell_h - f.shape[0]) * 0.5
+                    y += int(gap)
                 main_frame[y:y+f.shape[0],x:x+f.shape[1]] = f
             col += 1
             if col >= cols:
@@ -369,7 +408,10 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
         codec = metadata['video']['@codec_long_name']
         w = int(metadata['video']['@width'])
         h = int(metadata['video']['@height'])
-        duration = float(metadata['video']['@duration'])
+        if '@duration' in metadata['video']:
+            duration = float(metadata['video']['@duration'])
+        else:
+            duration = 1
         total_frames = int(round(duration * fps))
         frame_counter = -1
 
@@ -403,12 +445,22 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
                 reader._readFrame() # discard
 
         # copy remainder of video
-        pbar = tqdm(total=(total_frames+pad_frames-trim_frames), smoothing=0.1)
+        pbar = tqdm(total=(total_frames+pad_frames-trim_frames), smoothing=0.05)
         while True:
             try:
                 frame = reader._readFrame()
                 if not len(frame):
                     frame = None
+                else:
+                    # small bit of down scaling while maintaining
+                    # original aspect ratio
+                    target_area = 1280*720
+                    area = frame.shape[0] * frame.shape[1]
+                    #print("area:", area, "target_area:", target_area)
+                    if area > target_area:
+                        scale = math.sqrt( target_area / area )
+                        frame = cv2.resize(frame, (0,0), fx=scale, fy=scale,
+                                           interpolation=cv2.INTER_AREA)
             except:
                 frame = None
             if frame is None:
