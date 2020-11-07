@@ -13,7 +13,7 @@ from services import responses
 settings = common.get_config()
 
 # process any pending jobs on startup
-#responses.process( settings )
+responses.process( settings )
 
 # watch the inbox for form submissions (or edits)
 # imap host, username & password are stored externally as a json file.
