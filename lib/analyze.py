@@ -6,6 +6,8 @@ import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+#from pydub import playback
+from pydub import AudioSegment, scipy_effects # pip install pydub
 from scipy.signal import find_peaks
 from tqdm import tqdm
 
@@ -15,6 +17,8 @@ hop_length = 512
 
 class SampleGroup():
     def __init__(self):
+        self.sample_list = []
+        self.raw_list = []
         self.onset_list = []
         self.time_list = []
         self.beat_list = []
@@ -24,11 +28,42 @@ class SampleGroup():
         self.note_list = []
         self.leadin_list = []
         self.fadeout_list = []
-    
-    def compute_intensities(self, raws):
+
+    def load(self, project, name_list):
+        log("loading audio tracks...")
+        max_frame_rate = 0
+        self.sample_list = []
+        for track in name_list:
+            basename, ext = os.path.splitext(track)
+            path = os.path.join(project, track)
+            if ext == ".aif":
+                ext = ".aiff"
+            sample = AudioSegment.from_file(path, ext[1:])
+            sample = sample.set_channels(2) # force samples to be stereo
+            sample = sample.set_sample_width(2) # force to 2 for this project
+            sample = sample.normalize()
+            if sample.frame_rate > max_frame_rate:
+                max_frame_rate = sample.frame_rate
+            log(" ", track, "rate:", sample.frame_rate,
+                "channels:", sample.channels, "width:", sample.sample_width)
+            self.sample_list.append(sample)
+            
+        log("resampling all tracks at max frame rate:", max_frame_rate)
+        for i, sample in enumerate(self.sample_list):
+            self.sample_list[i] = self.sample_list[i].set_frame_rate(max_frame_rate)
+
+    def compute_raw(self):
+        self.raw_list = []
+        for sample in tqdm(self.sample_list):
+            mono = sample.set_channels(1) # convert to mono
+            mono_filt = scipy_effects.band_pass_filter(mono, 130, 523) #C3-C5
+            raw = mono_filt.get_array_of_samples()
+            self.raw_list.append(raw)
+            
+    def compute_intensities(self):
         print("Computing intensities...")
         self.intensity_list = []
-        for raw in tqdm(raws):
+        for raw in tqdm(self.raw_list):
             intensity = []
             base = 0
             while base < len(raw):
@@ -36,25 +71,25 @@ class SampleGroup():
                 base += hop_length
             self.intensity_list.append( np.array(intensity).astype('float') )
 
-    def compute_basic(self, samples, raws):
+    def compute_basic(self):
         print("Computing onset envelope and times...")
         self.onset_list = []
         self.time_list = []
-        for i, raw in enumerate(tqdm(raws)):
+        for i, raw in enumerate(tqdm(self.raw_list)):
             # compute onset envelopes
-            sr = samples[i].frame_rate
+            sr = self.sample_list[i].frame_rate
             oenv = librosa.onset.onset_strength(y=np.array(raw).astype('float'),
                                                 sr=sr, hop_length=hop_length)
             t = librosa.times_like(oenv, sr=sr, hop_length=hop_length)
             self.onset_list.append(oenv)
             self.time_list.append(t)
             
-    def compute_clarities(self, samples, raws):
+    def compute_clarities(self):
         print("Computing clarities...")
         self.clarity_list = []
         self.chroma_list = []
-        for i, raw in enumerate(tqdm(raws)):
-            sr = samples[i].frame_rate
+        for i, raw in enumerate(tqdm(self.raw_list)):
+            sr = self.sample_list[i].frame_rate
             chroma = librosa.feature.chroma_cqt(y=np.array(raw).astype('float'),
                                                 sr=sr, hop_length=hop_length)
             self.chroma_list.append(chroma)

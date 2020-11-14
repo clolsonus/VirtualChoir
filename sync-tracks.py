@@ -7,7 +7,7 @@ import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from pydub import AudioSegment, playback, scipy_effects  # pip install pydub
+#from pydub import AudioSegment, playback, scipy_effects  # pip install pydub
 from tqdm import tqdm
 
 from lib import analyze
@@ -137,27 +137,9 @@ if not os.path.exists(cache_dir):
 # initialize logger
 logger.init( os.path.join(results_dir, "report.txt") )
 
-# load audio tracks and normalize
-log("loading audio tracks...")
-audio_samples = []
-max_frame_rate = 0
-for track in audio_tracks:
-    basename, ext = os.path.splitext(track)
-    path = os.path.join(args.project, track)
-    if ext == ".aif":
-        ext = ".aiff"
-    sample = AudioSegment.from_file(path, ext[1:])
-    sample = sample.set_channels(2) # force samples to be stereo
-    sample = sample.set_sample_width(2) # force to 2 for this project
-    sample = sample.normalize()
-    if sample.frame_rate > max_frame_rate:
-        max_frame_rate = sample.frame_rate
-    log(" ", track, "rate:", sample.frame_rate, "channels:", sample.channels, "width:", sample.sample_width)
-    audio_samples.append(sample)
-    
-log("max sample rate:", max_frame_rate)
-for i, sample in enumerate(audio_samples):
-    audio_samples[i] = audio_samples[i].set_frame_rate(max_frame_rate)
+# load audio tracks, normalize, and resample at common (highest) sample rate
+audio_group = analyze.SampleGroup()
+audio_group.load(args.project, audio_tracks)
     
 sync_offsets = []
 if not aup_project:
@@ -166,19 +148,14 @@ if not aup_project:
     
     # generate mono version, set consistent sample rate, and filer for
     # analysis step
-    log("Analyzing audio tracks...")
-    audio_raws = []
-    for i, sample in enumerate(tqdm(audio_samples)):
-        mono = audio_samples[i].set_channels(1) # convert to mono
-        mono_filt = scipy_effects.band_pass_filter(mono, 130, 523) #C3-C5
-        raw = mono_filt.get_array_of_samples()
-        audio_raws.append(raw)
+    log("Generating raw signals...")
+    audio_group.compute_raw()
 
     # analyze audio streams (using librosa functions)
-    audio_group = analyze.SampleGroup()
-    audio_group.compute_basic(audio_samples, audio_raws)
-    audio_group.compute_intensities(audio_raws)
-    audio_group.compute_clarities(audio_samples, audio_raws)
+    log("Analyzing audio tracks...")
+    audio_group.compute_basic()
+    audio_group.compute_intensities()
+    audio_group.compute_clarities()
     #audio_group.gen_plots(audio_samples, audio_raws, audio_tracks, sync_offsets=None)
 
     log("Correlating audio samples")
@@ -220,8 +197,8 @@ if args.mute_videos:
     mute_tracks = video_tracks
 else:
     mute_tracks = []
-mixed = mixer.combine(audio_tracks, audio_samples, sync_offsets, mute_tracks,
-                      gain_hints=gain_hints, pan_range=0.25)
+mixed = mixer.combine(audio_tracks, audio_group.sample_list, sync_offsets,
+                      mute_tracks, gain_hints=gain_hints, pan_range=0.25)
 group_file = os.path.join(results_dir, "mixed_audio.mp3")
 log("Mixed audio file: mixed_audio.mp3")
 mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
