@@ -46,7 +46,7 @@ def process( settings ):
 
 def send_results(settings, request, subject, file_list):
     # send the results
-    command = [ "./FilemailCli",
+    command = [ "./bin/FilemailCli",
                 "--username=%s" % settings["filemail_email"],
                 "--userpassword=%s" % settings["filemail_password"],
                 "--files=%s" % ",".join(file_list),
