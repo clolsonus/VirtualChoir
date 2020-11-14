@@ -176,7 +176,11 @@ def run_job(settings, request):
         else:
             file_list.append( os.path.join(results_dir, file) )
     print("sending files:", file_list)
-    subject = "'Your virtual choir song: " + gd.folder_name + " is ready!'"
+    if "Song Name" in request and len(request["Song Name"]):
+        song_name = request["Song Name"]
+    else:
+        song_name = gd.folder_name
+    subject = "'Your virtual choir song: " + song_name + " is ready!'"
     result = send_results(settings, request, subject, file_list)
     if not result:
         return False
