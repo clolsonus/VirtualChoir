@@ -261,7 +261,7 @@ class SampleGroup():
                                             metric_list[j]])
                     print(i, j, self.time_list[i][shift])
                 elif max_index < len(metric_list[j]):
-                    shift = len(metric_list[j]) - max_index
+                    shift = len(metric_list[j]) - 1 - max_index
                     shift_time = -self.time_list[j][shift]
                     plot1 = np.concatenate([np.zeros(shift),
                                             metric_list[i]], axis=None)
