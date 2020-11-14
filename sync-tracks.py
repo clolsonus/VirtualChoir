@@ -193,10 +193,6 @@ if not aup_project:
     elif args.sync == "clap":
         log("Sync by lead in claps")
         audio_group.sync_by_claps()
-    #else:
-    #  audio_group.correlate_by_beats( audio_group.onset_list[0],
-    #                                  audio_group.time_list[0],
-    #                                  plot=True)
 
     log("Generating audacity_import.lof file")
     with open(os.path.join(results_dir, "audacity_import.lof"), 'w') as fp:
