@@ -111,6 +111,8 @@ def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
             synced_sample = pad + sample
         basename = os.path.basename(names[i])
         name, ext = os.path.splitext(basename)
+        # FilemailCli can't handle "," in file names
+        name = name.replace(',', '')
         output_file = os.path.join(results_dir, "aligned_audio_" + name + ".mp3")
         log(" ", "aligned_audio_" + name + ".mp3", "offset(sec):", sync_ms/1000)
         synced_sample.export(output_file, format="mp3")
