@@ -176,19 +176,19 @@ def render_combined_video(project, results_dir,
     # open all the video clips and grab some quick stats
     videos = []
     durations = []
-    areas = []
     for i, file in enumerate(video_names):
         v = VideoTrack()
         path = os.path.join(project, file)
         if v.open(path):
             videos.append(v)
             durations.append(v.duration + offsets[i])
-            areas.append(v.frame.shape[0] * v.frame.shape[1])
+        else:
+            # don't render but we still need a placeholder so videos
+            # continue match offset time list by position
+            videos.append(None)
     duration = np.median(durations)
     duration += 4 # for credits/fade out
     log("median video duration (with fade to credits):", duration)
-    median_area = np.median(areas)
-    log("median area (for rough sizing):", median_area)
     
     if len(videos) == 0:
         return
@@ -197,12 +197,13 @@ def render_combined_video(project, results_dir,
     num_portrait = 0
     num_landscape = 0
     for v in videos:
-        if not v.frame is None:
-            (h, w) = v.frame.shape[:2]
-            if w > h:
-                num_landscape += 1
-            else:
-                num_portrait += 1
+        if v is None or v.frame is None:
+            continue
+        (h, w) = v.frame.shape[:2]
+        if w > h:
+            num_landscape += 1
+        else:
+            num_portrait += 1
     cell_landscape = True
     if num_portrait > num_landscape:
         cell_landscape = False
@@ -210,9 +211,10 @@ def render_combined_video(project, results_dir,
     else:
         log("landscape dominant input videos")
 
+    num_good_videos = sum(v is not None for v in videos)
     cols = 1
     rows = 1
-    while cols * rows < len(videos):
+    while cols * rows < num_good_videos:
         if cell_landscape:
             if cols <= rows:
                 cols += 1
@@ -242,6 +244,9 @@ def render_combined_video(project, results_dir,
     pbar = tqdm(total=int(duration*output_fps), smoothing=0.05)
     while output_time <= duration:
         for i, v in enumerate(videos):
+            if v is None:
+                frames[i] = None
+                continue
             frame = v.get_frame(output_time - offsets[i])
             if not frame is None:
                 basevid = os.path.basename(video_names[i])
@@ -313,22 +318,23 @@ def render_combined_video(project, results_dir,
                 frames[i] = (frames[i] * 0.9).astype('uint8')
             else:
                 # bummer video with no frames?
-                pass
+                frames[i] = None
         main_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
 
         row = 0
         col = 0
         for i, f in enumerate(frames):
-            if not f is None:
-                x = int(round(border + col * (cell_w + border)))
-                y = int(round(border + row * (cell_h + border)))
-                if f.shape[1] < cell_w:
-                    gap = (cell_w - f.shape[1]) * 0.5
-                    x += int(gap)
-                if f.shape[0] < cell_h:
-                    gap = (cell_h - f.shape[0]) * 0.5
-                    y += int(gap)
-                main_frame[y:y+f.shape[0],x:x+f.shape[1]] = f
+            if f is None:
+                continue
+            x = int(round(border + col * (cell_w + border)))
+            y = int(round(border + row * (cell_h + border)))
+            if f.shape[1] < cell_w:
+                gap = (cell_w - f.shape[1]) * 0.5
+                x += int(gap)
+            if f.shape[0] < cell_h:
+                gap = (cell_h - f.shape[0]) * 0.5
+                y += int(gap)
+            main_frame[y:y+f.shape[0],x:x+f.shape[1]] = f
             col += 1
             if col >= cols:
                 col = 0
@@ -418,6 +424,8 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
         # pathfoo
         basename = os.path.basename(video)
         name, ext = os.path.splitext(basename)
+        # FilemailCli can't handle "," in file names
+        name = name.replace(',', '')
         tmp_video = os.path.join(results_dir, "tmp_video.mp4")
         tmp_audio = os.path.join(results_dir, "tmp_audio.mp3")
         output_file = os.path.join(results_dir, "aligned_video_" + name + ".mp4")
