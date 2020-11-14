@@ -22,33 +22,9 @@ class SampleGroup():
         self.intensity_list = []
         self.clarity_list = []
         self.note_list = []
+        self.leadin_list = []
+        self.fadeout_list = []
     
-    def load(self, filename, names):
-        if not os.path.exists(filename):
-            return False
-        else:
-            self.beat_list.clear()
-            with open(filename, "r") as fp:
-                clips = json.load(fp)
-            for i, name in enumerate(names):
-                print("loading:", name)
-                self.beat_list.append( clips[name]["beats"] )
-            return True
-
-    def save(self, filename, names):
-        # create dictionary of beat maps (by clip name)
-        clips = {}
-        for i, name in enumerate(names):
-            clips[name] = {}
-            clips[name]["beats"] = []
-            for b in self.beat_list[i]:
-                # trim to 3 decimal places
-                clips[name]["beats"].append( int(round(b * 10000)) / 10000 )
-        print("clips:", clips)
-
-        with open(filename, "w") as fp:
-            json.dump(clips, fp, indent=4)
-
     def compute_intensities(self, raws):
         print("Computing intensities...")
         self.intensity_list = []
@@ -60,6 +36,19 @@ class SampleGroup():
                 base += hop_length
             self.intensity_list.append( np.array(intensity).astype('float') )
 
+    def compute_basic(self, samples, raws):
+        print("Computing onset envelope and times...")
+        self.onset_list = []
+        self.time_list = []
+        for i, raw in enumerate(tqdm(raws)):
+            # compute onset envelopes
+            sr = samples[i].frame_rate
+            oenv = librosa.onset.onset_strength(y=np.array(raw).astype('float'),
+                                                sr=sr, hop_length=hop_length)
+            t = librosa.times_like(oenv, sr=sr, hop_length=hop_length)
+            self.onset_list.append(oenv)
+            self.time_list.append(t)
+            
     def compute_clarities(self, samples, raws):
         print("Computing clarities...")
         self.clarity_list = []
@@ -82,19 +71,40 @@ class SampleGroup():
             self.note_list.append(notes.T)
             self.clarity_list.append(clarity.T)
 
-    def compute_basic(self, samples, raws):
-        print("Computing onset envelope and times...")
-        self.onset_list = []
-        self.time_list = []
-        for i, raw in enumerate(tqdm(raws)):
-            # compute onset envelopes
-            sr = samples[i].frame_rate
-            oenv = librosa.onset.onset_strength(y=np.array(raw).astype('float'),
-                                                sr=sr, hop_length=hop_length)
-            t = librosa.times_like(oenv, sr=sr, hop_length=hop_length)
-            self.onset_list.append(oenv)
-            self.time_list.append(t)
-            
+    def compute_margins(self):
+        # presumes onset envelopes and clarities have been computed
+
+        dt = self.time_list[0][1] - self.time_list[0][0]
+        print("dt:", dt)
+        
+        # find the start time of the the first clear note
+        first_note = [0] * len(self.clarity_list)
+        lead_list = []
+        for i in range(len(self.clarity_list)):
+            clarity = self.clarity_list[i]
+            accum = 0
+            for j in range(len(clarity)):
+                accum += clarity[j]
+                #print(self.time_list[i][j], accum)
+                if accum > 100000:
+                    first_note[i] = j
+                    lead_list.append(self.intensity_list[i][:j])
+                    break
+        print("first notes:", first_note)
+
+        # ramp in/out
+        n = int(0.5 / dt)
+        for ll in lead_list:
+            print(len(ll), n)
+            if len(ll) > 2*n:
+                for i in range(n):
+                    ll[i] *= i/n
+                    ll[-(i+1)] *= i/n
+            else:
+                # skip super short lead in, sorry this one will need to
+                # get fixed by hand probably
+                pass
+
     def pretty_print_offset_array(self, offsets):
         print(offsets.shape)
         print("offsets: ", end='')
