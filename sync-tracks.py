@@ -49,7 +49,7 @@ def scan_directory(path, pretty_path=""):
         pretty_name = os.path.join(pretty_path, file)
         # print(pretty_name)
         if os.path.isdir(fullname):
-            if file == "results" or file == "state":
+            if file == "cache" or file == "results":
                 pass
             else:
                 scan_directory(fullname, os.path.join(pretty_path, file))
@@ -127,6 +127,12 @@ results_dir = os.path.join(args.project, "results")
 if not os.path.exists(results_dir):
     print("Creating:", results_dir)
     os.makedirs(results_dir)
+
+# make cache directory (if it doesn't exist)
+cache_dir = os.path.join(args.project, "cache")
+if not os.path.exists(cache_dir):
+    print("Creating:", cache_dir)
+    os.makedirs(cache_dir)
 
 # initialize logger
 logger.init( os.path.join(results_dir, "report.txt") )
