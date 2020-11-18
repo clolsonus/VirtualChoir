@@ -153,10 +153,10 @@ if not aup_project:
 
     # analyze audio streams (using librosa functions)
     log("Analyzing audio tracks...")
-    audio_group.compute_basic()
+    audio_group.compute_onset()
     audio_group.compute_intensities()
     audio_group.compute_clarities()
-    #audio_group.gen_plots(audio_samples, audio_raws, audio_tracks, sync_offsets=None)
+    #audio_group.gen_plots(audio_tracks, sync_offsets=None)
 
     log("Correlating audio samples")
     if args.reference:
@@ -175,7 +175,7 @@ if not aup_project:
         audio_group.correlate_mutual(audio_group.clarity_list, plot=False)
     elif args.sync == "clap":
         log("Sync by lead in claps")
-        audio_group.sync_by_claps()
+        audio_group.sync_by_claps(plot=False)
 
     log("Generating audacity_import.lof file")
     with open(os.path.join(results_dir, "audacity_import.lof"), 'w') as fp:
