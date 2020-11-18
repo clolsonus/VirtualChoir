@@ -60,18 +60,7 @@ class SampleGroup():
             raw = mono_filt.get_array_of_samples()
             self.raw_list.append(raw)
             
-    def compute_intensities(self):
-        print("Computing intensities...")
-        self.intensity_list = []
-        for raw in tqdm(self.raw_list):
-            intensity = []
-            base = 0
-            while base < len(raw):
-                intensity.append(np.max(raw[base:base+hop_length]))
-                base += hop_length
-            self.intensity_list.append( np.array(intensity).astype('float') )
-
-    def compute_basic(self):
+    def compute_onset(self):
         print("Computing onset envelope and times...")
         self.onset_list = []
         self.time_list = []
@@ -84,6 +73,17 @@ class SampleGroup():
             self.onset_list.append(oenv)
             self.time_list.append(t)
             
+    def compute_intensities(self):
+        print("Computing intensities...")
+        self.intensity_list = []
+        for raw in tqdm(self.raw_list):
+            intensity = []
+            base = 0
+            while base < len(raw):
+                intensity.append(np.max(raw[base:base+hop_length]))
+                base += hop_length
+            self.intensity_list.append( np.array(intensity).astype('float') )
+
     def compute_clarities(self):
         print("Computing clarities...")
         self.clarity_list = []
@@ -179,7 +179,7 @@ class SampleGroup():
         offsets -= np.median(offsets)
         return offsets                
  
-    def correlate_mutual(self, metric_list, offset_shift=None, plot=False):
+    def correlate_mutual(self, metric_list, plot=False):
         # compute relative time offsets by best correlation
         num = len(metric_list)
         offset_matrix = np.zeros( (num, num) )
@@ -236,15 +236,6 @@ class SampleGroup():
         self.offset_list = self.mutual_offset_solver(offset_matrix).tolist()
         log("Track time offsets (sec):", self.offset_list)
         
-        if offset_shift is None:
-            #self.shift = np.max(self.offset_list)
-            self.shift = 0.0
-        else:
-            self.shift = offset_shift
-        self.max_index = np.argmax(self.offset_list)
-        for i in range(len(self.offset_list)):
-            self.offset_list[i] -= self.shift
-
     def mydiff(self, a, b):
         an = a.shape[0]
         bn = b.shape[0]
@@ -259,7 +250,7 @@ class SampleGroup():
         result = np.amax(result) - result
         return result
     
-    def correlate_to_reference(self, ref_index, metric_list, offset_shift=None, plot=False):
+    def correlate_to_reference(self, ref_index, metric_list, plot=False):
         # compute relative time offsets by best correlation
         num = len(metric_list)
         self.offset_list = [0] * num
@@ -305,27 +296,8 @@ class SampleGroup():
                 plt.show()
         print("offset_list:\n", self.offset_list)
 
-        if False:
-            self.offset_list = []
-            for i in range(num):
-                diff_array = offset_matrix[0,:] - offset_matrix[i,:]
-                median = np.median(diff_array)
-                print(offset_matrix[i,:])
-                print(diff_array)
-                print(median, np.mean(diff_array), np.std(diff_array))
-                self.offset_list.append(median)
-        print(self.offset_list)
-        if offset_shift is None:
-            #self.shift = np.max(self.offset_list)
-            self.shift = 0.0
-        else:
-            self.shift = offset_shift
-        self.max_index = np.argmax(self.offset_list)
-        for i in range(len(self.offset_list)):
-            self.offset_list[i] -= self.shift
-
     # sync by claps
-    def sync_by_claps(self):
+    def sync_by_claps(self, plot=False):
         # presumes onset envelopes and clarities have been computed
 
         dt = self.time_list[0][1] - self.time_list[0][0]
@@ -336,13 +308,17 @@ class SampleGroup():
         lead_list = []
         for i in range(len(self.clarity_list)):
             clarity = self.clarity_list[i]
+            mean = np.mean(self.clarity_list[i])
+            std = np.std(self.clarity_list[i])
             accum = 0
             for j in range(len(clarity)):
-                accum += clarity[j]
-                #print(self.time_list[i][j], accum)
+                if clarity[j] > std * 0.25:
+                    accum += clarity[j]
+                    #print(self.time_list[i][j], accum)
                 if accum > 100000:
                     first_note[i] = j
-                    lead_list.append(self.intensity_list[i][:j])
+                    trim = int(round((1.0/dt)))
+                    lead_list.append(self.intensity_list[i][:j-trim])
                     break
         print("first notes:", first_note)
 
@@ -355,8 +331,8 @@ class SampleGroup():
                     ll[i] *= i/n
                     ll[-(i+1)] *= i/n
             else:
-                # skip super short lead in, sorry this one will need to
-                # get fixed by hand probably
+                # skip super short lead in, sorry this track will need
+                # to get aligned by hand probably
                 pass
 
         # smooth (spread out peaks so better chance of overlapping
@@ -365,20 +341,21 @@ class SampleGroup():
             box = np.ones(box_pts)/box_pts
             lead_list[i] = np.convolve(lead_list[i], box, mode='same')
             
-        self.correlate_mutual(lead_list, plot=False)
+        self.correlate_mutual(lead_list, plot=plot)
                 
     # visualize audio streams (using librosa functions)
-    def gen_plots(self, samples, raws, names, sync_offsets=None):
+    def gen_plots(self, names, sync_offsets=None):
         print("Generating basic clip waveform...")
         # plot basic clip waveforms
-        fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
-        for i in range(len(raws)):
-            sr = samples[i].frame_rate
+        fig, ax = plt.subplots(nrows=len(self.raw_list),
+                               sharex=True, sharey=True)
+        for i in range(len(self.raw_list)):
+            sr = self.sample_list[i].frame_rate
             if sync_offsets is None:
                 trimval = 0
             else:
                 trimval = int(round(sync_offsets[i] * sr / 1000))
-            librosa.display.waveplot(np.array(raws[i][trimval:]).astype('float'), sr=samples[i].frame_rate, ax=ax[i])
+            librosa.display.waveplot(np.array(self.raw_list[i][trimval:]).astype('float'), sr=sr, ax=ax[i])
             ax[i].set(title=names[i])
             ax[i].label_outer()
             if ( len(self.beat_list) ):
@@ -393,9 +370,9 @@ class SampleGroup():
             ax[i].plot(self.time_list[i], self.onset_list[i])
 
         print("Intensity plot...")
-        fig, ax = plt.subplots(nrows=len(raws),
+        fig, ax = plt.subplots(nrows=len(self.raw_list),
                                sharex=True, sharey=True)
-        for i in range(len(raws)):
+        for i in range(len(self.raw_list)):
             #ax[i].plot(self.time_list[i], self.onset_list[i])
             a = len(self.time_list[i])
             b = len(self.intensity_list[i])
@@ -410,10 +387,11 @@ class SampleGroup():
             # but we are passing in mono here)
             print("Generating chroma plot...")
             chromas = []
-            fig, ax = plt.subplots(nrows=len(raws), sharex=True, sharey=True)
-            for i in range(len(raws)):
+            fig, ax = plt.subplots(nrows=len(self.raw_list),
+                                   sharex=True, sharey=True)
+            for i in range(len(self.raw_list)):
                 print(" ", names[i])
-                sr = samples[i].frame_rate
+                sr = self.sample_list[i].frame_rate
                 if sync_offsets is None:
                     trimval = 0
                 else:
@@ -426,14 +404,18 @@ class SampleGroup():
             fig.colorbar(img, ax=ax)
 
             print("Note clarity plot...")
-            fig, ax = plt.subplots(nrows=len(raws),
+            fig, ax = plt.subplots(nrows=len(self.raw_list),
                                    sharex=True, sharey=True)
-            for i in range(len(raws)):
+            for i in range(len(self.raw_list)):
                 a = len(self.time_list[i])
                 c = self.clarity_list[i].shape[0]
                 min = np.min([a, b, c])
+                mean = np.mean(self.clarity_list[i])
+                std = np.std(self.clarity_list[i])
                 print(i, len(self.time_list[i]), len(self.intensity_list[i]),
-                      self.chroma_list[i].shape[1])
+                      self.chroma_list[i].shape[1]) 
                 ax[i].plot(self.time_list[i][:min], self.clarity_list[i][:min])
-        
+                ax[i].hlines(y=mean, xmin=0, xmax=1)
+                ax[i].hlines(y=std, xmin=0, xmax=1)
+       
         plt.show()
