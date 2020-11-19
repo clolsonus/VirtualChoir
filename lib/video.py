@@ -118,6 +118,50 @@ class VideoTrack:
         frame = frame[:,:,::-1]     # convert from RGB to BGR (to make opencv happy)
         return frame
 
+# return a scaled versino of the frame that fits
+def get_fit(frame, scale_w, scale_h):
+    if scale_w < scale_h:
+        result = cv2.resize(frame, (0,0), fx=scale_w, fy=scale_w,
+                            interpolation=cv2.INTER_AREA)
+    else:
+        result = cv2.resize(frame, (0,0), fx=scale_h, fy=scale_h,
+                            interpolation=cv2.INTER_AREA)
+    return result
+
+def get_zoom(frame, scale_w, scale_h):
+    if scale_w < scale_h:
+        result = cv2.resize(frame, (0,0), fx=scale_h, fy=scale_h,
+                            interpolation=cv2.INTER_AREA)
+    else:
+        result = cv2.resize(frame, (0,0), fx=scale_w, fy=scale_w,
+                            interpolation=cv2.INTER_AREA)
+    return result
+        
+def clip_frame(frame, cell_w, cell_h):
+    (tmp_h, tmp_w) = frame.shape[:2]
+    if tmp_h > cell_h:
+        cuth = int((tmp_h - cell_h) * 0.5)
+    else:
+        cuth = 0
+    if tmp_w > cell_w:
+        cutw = int((tmp_w - cell_w) * 0.5)
+    else:
+        cutw = 0
+    return frame[cuth:cuth+int(round(cell_h)),cutw:cutw+int(round(cell_w))]
+
+# modifies bg
+def overlay_frames(bg, fg):
+    x = 0
+    y = 0
+    if fg.shape[1] < bg.shape[1]:
+        gap = (bg.shape[1] - fg.shape[1]) * 0.5
+        x += int(gap)
+    if fg.shape[0] < bg.shape[0]:
+        gap = (bg.shape[0] - fg.shape[0]) * 0.5
+        y += int(gap)
+    bg[y:y+fg.shape[0],x:x+fg.shape[1]] = fg
+    return bg
+
 # fixme: figure out why zooming on some landscape videos in some cases
 #        doesn't always fill the grid cell (see Coeur, individual grades.) 
 def render_combined_video(project, results_dir,
@@ -270,48 +314,26 @@ def render_combined_video(project, results_dir,
                 
                 #option = "fit"
                 option = "zoom"
+                background = None
                 if option == "fit":
-                    if scale_w < scale_h:
-                        frame_scale = cv2.resize(frame, (0,0), fx=scale_w,
-                                                 fy=scale_w,
-                                                 interpolation=cv2.INTER_AREA)
-                    else:
-                        frame_scale = cv2.resize(frame, (0,0), fx=scale_h,
-                                                 fy=scale_h,
-                                                 interpolation=cv2.INTER_AREA)
-                    frames[i] = frame_scale
+                    frames[i] = get_fit(frame, scale_w, scale_h)
                 elif option == "zoom":
                     if cell_landscape != vid_landscape:
-                        # compromise zoom/fit/arrangement
+                        # background/wings full zoom
+                        background = get_zoom(frame, scale_w, scale_h)
+                        background = cv2.blur(background, (43, 43))
+                        background = clip_frame(background, cell_w, cell_h)
+                        # foreground compromise zoom/fit/arrangement
                         avg = (scale_w + scale_h) * 0.5
                         scale_w = avg
                         scale_h = avg
                         #print("scale:", scale_w, scale_h)
-                    if scale_w < scale_h:
-                        frame_scale = cv2.resize(frame, (0,0), fx=scale_h,
-                                                 fy=scale_h,
-                                                 interpolation=cv2.INTER_AREA)
-                        #(tmp_h, tmp_w) = frame_scale.shape[:2]
-                        #cut = int((tmp_w - cell_w) * 0.5)
-                        #frame_scale = frame_scale[:,cut:cut+int(round(cell_w))]
+                    frame_scale = get_zoom(frame, scale_w, scale_h)
+                    frame_scale = clip_frame(frame_scale, cell_w, cell_h)
+                    if background is None:
+                        frames[i] = frame_scale
                     else:
-                        frame_scale = cv2.resize(frame, (0,0), fx=scale_w,
-                                                 fy=scale_w,
-                                                 interpolation=cv2.INTER_AREA)
-                    (tmp_h, tmp_w) = frame_scale.shape[:2]
-                    if tmp_h > cell_h:
-                        cuth = int((tmp_h - cell_h) * 0.5)
-                    else:
-                        cuth = 0
-                    if tmp_w > cell_w:
-                        cutw = int((tmp_w - cell_w) * 0.5)
-                    else:
-                        cutw = 0
-                    frame_scale = frame_scale[cuth:cuth+int(round(cell_h)),cutw:cutw+int(round(cell_w))]
-                    #if cell_landscape != vid_landscape:
-                    #    print("scaled size h x w:", tmp_h, tmp_w)
-                    #    print("cropped size:", frame_scale.shape[:2])
-                    frames[i] = frame_scale
+                        frames[i] = overlay_frames(background, frame_scale)
                 # cv2.imshow(video_names[i], frame_scale)
             elif not frames[i] is None:
                 # fade
