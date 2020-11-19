@@ -5,6 +5,7 @@ from datetime import datetime
 import io
 import os
 import pickle
+import sys
 import time
 
 # great info here, including setting yourself up with a credentials.json file:
@@ -21,7 +22,8 @@ from . import common
 class gdrive():
     # If modifying these scopes, delete the file token.pickle.
     #SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
-    SCOPES = ['https://www.googleapis.com/auth/drive']
+    #SCOPES = ['https://www.googleapis.com/auth/drive']
+    SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
     def __init__(self):
         self.folder_name = None
@@ -61,16 +63,14 @@ class gdrive():
             else:
                 folder_id = p
                 break
-        print('folder_id:', folder_id)
+        print('folder id (parsed from url):', folder_id)
         return folder_id
 
     def fix_extension(self, name, mimeType):
         basename, ext = os.path.splitext(name)
-        print("fix_extension:", basename, ":", ext)
         if len(ext):
             return name
         else:
-            print("Need to fix extension:", name)
             # add an extension based on mimeType
             if mimeType.startswith("audio/"):
                 ext = mimeType[6:]
@@ -91,6 +91,7 @@ class gdrive():
                     ext = "mp4"
             else:
                 ext = "totally_unknown"
+            print("Fix file extension:", name, "adding:", ext)
             return basename + "." + ext
             
     def sync_folder(self, url, subpath=None):
@@ -103,22 +104,23 @@ class gdrive():
             os.makedirs(project_dir)
 
         # Get shared folder details
-        print("folder id:", folder_id)
         try:
-            results = self.service.files().get(fileId=folder_id, fields='*').execute()
+            results = self.service.files().get(fileId=folder_id, supportsAllDrives=True, fields='*').execute()
         except:
+            print("Unexpected error:", sys.exc_info())
             print("Folder not found, check path and check it is shared outside your organization")
             return False
-        print("results:", results)
+        # print("results:", results)
         if "name" in results and not self.folder_name:
             self.folder_name = results["name"]
         else:
             self.folder_name = folder_id
+        print("Found folder name:", self.folder_name)
         
         # Call the Drive v3 API
         results = self.service.files().list(
             q="'" + folder_id + "' in parents",
-            pageSize=100,
+            pageSize=1000,
             fields="nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, trashed)").execute()
         items = results.get('files', [])
         if not items:
@@ -130,21 +132,47 @@ class gdrive():
             work_dir = subpath
         else:
             work_dir = os.path.join(project_dir, folder_id)
-        # create if needed
+        # create new folder if needed
         if not os.path.exists(work_dir):
             print("Creating:", work_dir)
             os.makedirs(work_dir)
 
+        # find/remove existing files that no longer exist on the remote side
+        remote_names = []
+        for item in items:
+            if not item['trashed']:
+                 name = self.fix_extension(item['name'], item['mimeType'])
+                 remote_names.append(name)
+        for file in sorted(os.listdir(work_dir)):
+            basename, ext = os.path.splitext(file)
+            # protect some files
+            if file == "cache" or file == "results":
+                print("INFO: Preserving local work directory:", file)
+            elif ext == ".lof":
+                print("INFO: Preserving local .lof file:", file)
+            elif ext == ".txt":
+                # maybe I created a hints.txt locally that I'd like to
+                # preserve
+                print("INFO: Preserving local file:", file)
+            elif ext == ".aup" or (file.endswith("_data") and os.path.isdir(os.path.join(work_dir, file))):
+                print("INFO: Preserving audacity project:", file)
+            elif not file in remote_names:
+                trashed_file = os.path.join(work_dir, file)
+                print("NOTICE: deleting local file:", trashed_file)
+                os.unlink(trashed_file)
+
+        # download / update folder items and recurse to subfolders
         for item in items:
             if item['trashed']:
                 continue
 
-            print(item)
+            #print(item)
+            print("%s (%s) %.0f Kb" % (item["name"], item["mimeType"], int(item["size"]) / 1024 ))
             dt = datetime.strptime(item['createdTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
             created = time.mktime(dt.timetuple())
             dt = datetime.strptime(item['modifiedTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
             modified = time.mktime(dt.timetuple())
-            print("ts:", created, modified)                                   
+            print("  ts:", created, modified)                                   
 
             if item['mimeType'].endswith("folder"):
                 # recurse folders
@@ -159,17 +187,17 @@ class gdrive():
                     statinfo = os.stat(dest_file)
                     mtime = statinfo.st_mtime
                     if modified <= mtime or item['size'] != statinfo.st_size:
-                        print("Skipping, already downloaded")
+                        print("  Skipping, already downloaded")
                         continue
-                print("Downloading to:", dest_file)
+                print("  Downloading to:", dest_file)
                 request = self.service.files().get_media(fileId=item['id'])
                 fh = io.BytesIO()
                 downloader = MediaIoBaseDownload(fh, request)
                 done = False
                 while done is False:
                     status, done = downloader.next_chunk()
-                    print("Download %d%%." % int(status.progress() * 100))
-                print("downloaded bytes:", len(fh.getvalue()))
+                    print("  Download %d%%." % int(status.progress() * 100))
+                print("  downloaded bytes:", len(fh.getvalue()))
                 with open(dest_file, 'wb') as f:
                     f.write(fh.getvalue())
                     f.close()
