@@ -187,7 +187,7 @@ else:
     # we found an audacity project, let's read the sync offsets from that
     log("Found an audacity project file, using that for time syncs:",
         aup_project, fancy=True)
-    sync_offsets = aup.offsets_from_aup(audio_tracks, audio_samples,
+    sync_offsets = aup.offsets_from_aup(audio_tracks, audio_group.sample_list,
                                         args.project, aup_project)
 
 log("Mixing samples...", fancy=True)
