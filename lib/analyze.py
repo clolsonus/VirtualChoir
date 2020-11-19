@@ -8,7 +8,6 @@ import numpy as np
 import os
 #from pydub import playback
 from pydub import AudioSegment, scipy_effects # pip install pydub
-from scipy.signal import find_peaks
 from tqdm import tqdm
 
 from .logger import log
@@ -261,7 +260,6 @@ class SampleGroup():
                                  mode='full')
             #ycorr = self.mydiff(metric_list[ref_index], metric_list[i])
             max_val = np.amax(ycorr)
-            peaks, _ = find_peaks(ycorr, height=max_val*0.8, distance=50)
             max_index = np.argmax(ycorr)
             print("max index:", max_index)
             if max_index > len(metric_list[i]):
@@ -288,7 +286,6 @@ class SampleGroup():
             if plot:
                 plt.figure()
                 plt.plot(ycorr)
-                plt.plot(peaks, ycorr[peaks], "x")
                 plt.figure()
                 plt.plot(plot1, label=ref_index)
                 plt.plot(plot2, label=i)

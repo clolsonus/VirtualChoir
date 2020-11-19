@@ -93,6 +93,14 @@ def combine(names, samples, sync_offsets, mute_tracks,
     return mixed
     
 def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
+    # first clean out any previous aligned_audio tracks in case tracks
+    # have been updated or added or removed since the previous run.
+    for file in sorted(os.listdir(results_dir)):
+        if file.startswith("aligned_audio_"):
+            fullname = os.path.join(results_dir, file)
+            log("NOTICE: deleting file from previous run:", file)
+            os.unlink(fullname)
+        
     log("Writing aligned version of samples (padded/trimed)...", fancy=True)
     for i, sample in enumerate(samples):
         if names[i] in mute_tracks:

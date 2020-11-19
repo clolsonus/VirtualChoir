@@ -187,7 +187,7 @@ else:
     # we found an audacity project, let's read the sync offsets from that
     log("Found an audacity project file, using that for time syncs:",
         aup_project, fancy=True)
-    sync_offsets = aup.offsets_from_aup(audio_tracks, audio_samples,
+    sync_offsets = aup.offsets_from_aup(audio_tracks, audio_group.sample_list,
                                         args.project, aup_project)
 
 log("Mixing samples...", fancy=True)
@@ -206,8 +206,8 @@ mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album
 if args.write_aligned_tracks:
     log("Generating trimmed/padded tracks that start at a common aligned time.")
     # write trimmed/padded samples for 'easy' alignment
-    mixer.save_aligned(results_dir, audio_tracks, audio_samples, sync_offsets,
-                       mute_tracks)
+    mixer.save_aligned(results_dir, audio_tracks, audio_group.sample_list,
+                       sync_offsets, mute_tracks)
 
 if len(video_tracks) and not args.no_video:
     log("Generating gridded video", fancy=True)
