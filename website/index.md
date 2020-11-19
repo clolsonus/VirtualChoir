@@ -9,7 +9,8 @@ layout: home
 
 # Let your voice soar!
 
-Autosync your tracks - mix your audio - produce a gridded video.
+Autosync your tracks - mix your audio - produce a gridded video -
+no software to learn - works on any platform - 100% fast and free.
 
 ## Make your own virtual choir videos in 3 easy steps
 
