@@ -389,6 +389,14 @@ def merge(results_dir):
 #ffmpeg -f lavfi -i color=c=black:s=1920x1080:r=25:d=1 -i testa444.mov -filter_complex "[0:v] trim=start_frame=1:end_frame=5 [blackstart]; [0:v] trim=start_frame=1:end_frame=3 [blackend]; [blackstart] [1:v] [blackend] concat=n=3:v=1:a=0[out]" -map "[out]" -c:v qtrle -c:a copy -timecode 01:00:00:00 test16.mov
 
 def save_aligned(project, results_dir, video_names, sync_offsets):
+    # first clean out any previous aligned_audio tracks in case tracks
+    # have been updated or added or removed since the previous run.
+    for file in sorted(os.listdir(results_dir)):
+        if file.startswith("aligned_video_"):
+            fullname = os.path.join(results_dir, file)
+            log("NOTICE: deleting file from previous run:", file)
+            os.unlink(fullname)
+            
     log("Writing aligned version of videos...", fancy=True)
     for i, video in enumerate(video_names):
         video_file = os.path.join(project, video)
