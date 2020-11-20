@@ -167,7 +167,6 @@ class gdrive():
                 continue
 
             #print(item)
-            print("%s (%s) %.0f Kb" % (item["name"], item["mimeType"], int(item["size"]) / 1024 ))
             dt = datetime.strptime(item['createdTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
             created = time.mktime(dt.timetuple())
             dt = datetime.strptime(item['modifiedTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
@@ -181,6 +180,7 @@ class gdrive():
                 self.sync_folder(newurl, newpath)
             else:
                 # fetch file
+                print("%s (%s) %.0f Kb" % (item["name"], item["mimeType"], int(item["size"]) / 1024 ))
                 name = self.fix_extension(item['name'], item['mimeType'])
                 dest_file = os.path.join(work_dir, name)
                 if os.path.exists(dest_file):
