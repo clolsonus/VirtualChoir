@@ -25,6 +25,8 @@ class SampleGroup():
         self.intensity_list = []
         self.clarity_list = []
         self.note_list = []
+        self.envelope_list = []
+        self.suppress_list = None
         self.leadin_list = []
         self.fadeout_list = []
 
@@ -105,11 +107,74 @@ class SampleGroup():
             self.note_list.append(notes.T)
             self.clarity_list.append(clarity.T)
 
+    def compute_envelopes(self):
+        self.envelope_list = []
+        self.suppress_list = []
+        
+        # presumes clarities have been computed
+        dt = self.time_list[0][1] - self.time_list[0][0]
+        for i in range(len(self.clarity_list)):
+            clarity = self.clarity_list[i]
+            times = self.time_list[i]
+            env = []
+            commands = []
+            print("track:", i, len(clarity))
+            mean = np.mean(self.clarity_list[i])
+            std = np.std(self.clarity_list[i])
+            threshold = std * 0.1
+            start = 0
+            end = 0
+            active = None
+            for j in range(len(clarity)):
+                if clarity[j] < threshold:
+                    if active is None:
+                        # starting inactive
+                        env.append( [times[j], 0] )
+                    elif active:
+                        # just entered a dead spot
+                        #print(" active:", active, start, end)
+                        env.append( [times[j], 1] )
+                        start = j
+                    active = False
+                else:
+                    if active is None:
+                        # starting active
+                        env.append( [times[j], 1] )
+                    elif not active:
+                        # just entered a live spot
+                        commands.append([times[start], times[end]])
+                        # shape the dead spot env
+                        if end - start >= 3:
+                            #print(" active:", active, start, end)
+                            if (end - start)*dt >= 0.2:
+                                p1 = start + int(round(0.1/dt))
+                                p2 = end - int(round(0.1/dt))
+                                env.append( [times[p1], 0] )
+                                env.append( [times[p2], 0] )
+                            else:
+                                mid = int((end + start)*0.5)
+                                env.append( [times[mid], 0] )
+                            env.append( [times[end], 1] )
+                            start = j
+                    active = True
+                end = j
+            #print(" active:", active, start, end)
+            if active:
+                env.append( [times[end], 1] )
+            else:
+                if (end - start)*dt >= 0.1:
+                    p1 = start + int(round(0.1/dt))
+                    env.append( [times[p1], 0] )
+                env.append( [times[end], 0] )
+            #print(env)
+            self.envelope_list.append(env)
+            #print(commands)
+            self.suppress_list.append(commands)
+            
     def compute_margins(self):
         # presumes onset envelopes and clarities have been computed
-
         dt = self.time_list[0][1] - self.time_list[0][0]
-        print("dt:", dt)
+        #print("dt:", dt)
         
         # find the start time of the the first clear note
         first_note = [0] * len(self.clarity_list)
@@ -408,10 +473,14 @@ class SampleGroup():
                 c = self.clarity_list[i].shape[0]
                 min = np.min([a, b, c])
                 mean = np.mean(self.clarity_list[i])
-                std = np.std(self.clarity_list[i])
+                std = np.std(self.clarity_list[i])                
                 print(i, len(self.time_list[i]), len(self.intensity_list[i]),
                       self.chroma_list[i].shape[1]) 
                 ax[i].plot(self.time_list[i][:min], self.clarity_list[i][:min])
+                max = np.max(self.clarity_list[i])
+                if not self.envelope_list is None:
+                    env = np.array(self.envelope_list[i]).astype('float').T
+                    ax[i].plot(env[0,:], env[1,:]*max)
                 ax[i].hlines(y=mean, xmin=0, xmax=1)
                 ax[i].hlines(y=std, xmin=0, xmax=1)
        
