@@ -7,7 +7,7 @@ import random
 from .logger import log
 
 def combine(names, samples, sync_offsets, mute_tracks,
-            gain_hints={}, pan_range=0):
+            gain_hints={}, pan_range=0, suppress_list=None):
     durations_ms = []
     for i, sample in enumerate(samples):
         # print(names[i], len(sample) / 1000, sync_offsets[i])
@@ -47,7 +47,39 @@ def combine(names, samples, sync_offsets, mute_tracks,
         sample = sample.set_channels(2)
         if pan_range > 0.00001 and pan_range <= 1.0:
             sample = sample.pan( random.uniform(-pan_range, pan_range) )
-        sample = sample.fade_in(1000)
+        if suppress_list is None:
+            sample = sample.fade_in(1000)
+        else:
+            commands = suppress_list[i]
+            # print("commands:", commands)
+            blend = 100         # ms
+            seg = None
+            start = 0
+            for cmd in commands:
+                # print("command:", cmd)
+                (t0, t1) = cmd
+                ms0 = int(round(t0*1000))
+                ms1 = int(round(t1*1000))
+                # print("  start:", start, "range:", ms0, ms1)
+                if ms1 - ms0 < blend:
+                    continue
+                if ms0 > start:
+                    clip = sample[start-blend:ms0+blend]
+                    # print("clip:", start-blend, ms0+blend)
+                    seg = seg.append(clip)
+                # print("silent:", ms0, ms1)
+                clip = AudioSegment.silent(duration=ms1-ms0)
+                if seg is None:
+                    seg = clip
+                else:
+                    seg = seg.append(clip)
+                start = ms1
+            # catch the last segment
+            if start < len(sample) - blend:
+                clip = sample[start-blend:]
+                seg = seg.append(clip)
+            # print("lengths:", len(sample), len(seg))
+            sample = seg
         sr = sample.frame_rate
         sync_ms = sync_offset
         if sync_ms >= 0:

@@ -22,6 +22,7 @@ parser.add_argument('project', help='project folder')
 parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
                     help='sync strategy')
 parser.add_argument('--reference', help='file name of declared refrence track')
+parser.add_argument('--suppress-noise', action='store_true', help='try to suppress extraneous noises.')
 parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
 parser.add_argument('--no-video', action='store_true', help='skip the video production.')
 parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
@@ -156,7 +157,9 @@ if not aup_project:
     audio_group.compute_onset()
     audio_group.compute_intensities()
     audio_group.compute_clarities()
-    #audio_group.gen_plots(audio_tracks, sync_offsets=None)
+    if args.suppress_noise:
+        audio_group.compute_envelopes()
+    # audio_group.gen_plots(audio_tracks, sync_offsets=None)
 
     log("Correlating audio samples")
     if args.reference:
@@ -198,7 +201,8 @@ if args.mute_videos:
 else:
     mute_tracks = []
 mixed = mixer.combine(audio_tracks, audio_group.sample_list, sync_offsets,
-                      mute_tracks, gain_hints=gain_hints, pan_range=0.25)
+                      mute_tracks, gain_hints=gain_hints, pan_range=0.25,
+                      suppress_list=audio_group.suppress_list)
 group_file = os.path.join(results_dir, "mixed_audio.mp3")
 log("Mixed audio file: mixed_audio.mp3")
 mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
