@@ -2,7 +2,7 @@
 layout: post
 title:  "Demo Video - Natus est Nobis"
 date:   2020-10-28 11:19:13 -0500
-categories: demo
+categories: demos
 ---
 
 Clement Cano, one of the cocreators of the facebook Virtual Choir
