@@ -81,6 +81,7 @@ def scan_directory(path, pretty_path=""):
                 print("Unknown extenstion (skipping):", file)
 
 log("Begin processing job", fancy=True)
+log("Command line arguments:", args)
 
 scan_directory(args.project)
 
