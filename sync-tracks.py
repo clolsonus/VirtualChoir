@@ -142,11 +142,10 @@ logger.init( os.path.join(results_dir, "report.txt") )
 # load audio tracks, normalize, and resample at common (highest) sample rate
 audio_group = analyze.SampleGroup()
 audio_group.load(args.project, audio_tracks)
-    
-sync_offsets = []
-if not aup_project:
-    # let's figure out the autosync, fingers crossed!!!
-    log("Starting automatic track alignment process...", fancy=True)
+
+if args.suppress_noise or not aup_project:
+    # we need to do a full analysis if we are asked to suppress noise
+    # or we need to compute sync
     
     # generate mono version, set consistent sample rate, and filer for
     # analysis step
@@ -161,7 +160,12 @@ if not aup_project:
     if args.suppress_noise:
         audio_group.compute_envelopes()
     # audio_group.gen_plots(audio_tracks, sync_offsets=None)
-
+    
+sync_offsets = []
+if not aup_project:
+    # let's figure out the autosync, fingers crossed!!!
+    log("Starting automatic track alignment process...", fancy=True)
+    
     log("Correlating audio samples")
     if args.reference:
         ref_index = -1
@@ -212,7 +216,7 @@ if args.write_aligned_tracks:
     log("Generating trimmed/padded tracks that start at a common aligned time.")
     # write trimmed/padded samples for 'easy' alignment
     mixer.save_aligned(results_dir, audio_tracks, audio_group.sample_list,
-                       sync_offsets, mute_tracks)
+                       mute_tracks)
 
 if len(video_tracks) and not args.no_video:
     log("Generating gridded video", fancy=True)
