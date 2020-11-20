@@ -15,6 +15,9 @@ def combine(names, samples, sync_offsets, mute_tracks,
     duration_ms = np.median(durations_ms)
     log("median audio duration (sec):", duration_ms / 1000)
 
+    if not suppress_list is None:
+        log("NOTICE: performing noise surpression on individual tracks.")
+        
     # auto mute reference tracks, but include accompaniment
     for name in names:
         print("checking:", name)
@@ -52,33 +55,40 @@ def combine(names, samples, sync_offsets, mute_tracks,
         else:
             commands = suppress_list[i]
             # print("commands:", commands)
-            blend = 100         # ms
+            blend = 300         # ms
             seg = None
             start = 0
             for cmd in commands:
-                # print("command:", cmd)
+                #print("command:", cmd)
                 (t0, t1) = cmd
                 ms0 = int(round(t0*1000))
                 ms1 = int(round(t1*1000))
-                # print("  start:", start, "range:", ms0, ms1)
-                if ms1 - ms0 < blend:
+                #print("  start:", start, "range:", ms0, ms1)
+                if ms1 - ms0 < 2*blend:
                     continue
                 if ms0 > start:
-                    clip = sample[start-blend:ms0+blend]
-                    # print("clip:", start-blend, ms0+blend)
-                    seg = seg.append(clip)
-                # print("silent:", ms0, ms1)
+                    if start < blend:
+                        clip = sample[start:ms0+blend]
+                        #print("clip:", start, ms0+blend)
+                    else:
+                        clip = sample[start-blend:ms0+blend]
+                        #print("clip:", start-blend, ms0+blend)
+                    if seg is None:
+                        seg = clip
+                    else:
+                        seg = seg.append(clip, crossfade=blend)
+                #print("silent:", ms0, ms1)
                 clip = AudioSegment.silent(duration=ms1-ms0)
                 if seg is None:
                     seg = clip
                 else:
-                    seg = seg.append(clip)
+                    seg = seg.append(clip, crossfade=blend)
                 start = ms1
             # catch the last segment
             if start < len(sample) - blend:
                 clip = sample[start-blend:]
-                seg = seg.append(clip)
-            # print("lengths:", len(sample), len(seg))
+                seg = seg.append(clip, crossfade=blend)
+            #print("lengths:", len(sample), len(seg))
             sample = seg
         sr = sample.frame_rate
         sync_ms = sync_offset
@@ -90,6 +100,8 @@ def combine(names, samples, sync_offsets, mute_tracks,
         # trim end for length
         synced_sample = synced_sample[:duration_ms]
         synced_sample = synced_sample.fade_out(1000)
+        samples[i] = synced_sample
+        log("notice: overwriting original sample with aligned version")
         
         y = np.array(synced_sample.get_array_of_samples()).astype('double')
         print(i, "max:", np.max(y))
@@ -123,8 +135,11 @@ def combine(names, samples, sync_offsets, mute_tracks,
     mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
     mixed.normalize()
     return mixed
-    
-def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
+
+# presumes the mixer has updated each sample with align/trim/pad and
+# noise suppression if requested, so this function just writes those
+# out without further modification.
+def save_aligned(results_dir, names, samples, mute_tracks,):
     # first clean out any previous aligned_audio tracks in case tracks
     # have been updated or added or removed since the previous run.
     for file in sorted(os.listdir(results_dir)):
@@ -138,22 +153,11 @@ def save_aligned(results_dir, names, samples, sync_offsets, mute_tracks,):
         if names[i] in mute_tracks:
             log("skipping muted:", names[i])
             continue
-        if sync_offsets is None:
-            sync_ms = 0
-        else:
-            sync_ms = sync_offsets[i]
-        sample = sample.set_channels(2)
-        sr = sample.frame_rate
-        if sync_ms >= 0:
-            synced_sample = sample[sync_ms:]
-        else:
-            pad = AudioSegment.silent(duration=-sync_ms)
-            synced_sample = pad + sample
         basename = os.path.basename(names[i])
         name, ext = os.path.splitext(basename)
         # FilemailCli can't handle "," in file names
         name = name.replace(',', '')
         output_file = os.path.join(results_dir, "aligned_audio_" + name + ".mp3")
-        log(" ", "aligned_audio_" + name + ".mp3", "offset(sec):", sync_ms/1000)
-        synced_sample.export(output_file, format="mp3")
+        log(" ", "aligned_audio_" + name + ".mp3")
+        sample.export(output_file, format="mp3")
     
