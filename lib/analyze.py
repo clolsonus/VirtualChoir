@@ -121,7 +121,7 @@ class SampleGroup():
             print("track:", i, len(clarity))
             mean = np.mean(self.clarity_list[i])
             std = np.std(self.clarity_list[i])
-            threshold = std * 0.1
+            threshold = std * 0.07
             start = 0
             end = 0
             active = None
