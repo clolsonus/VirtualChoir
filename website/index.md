@@ -7,7 +7,7 @@ layout: home
 
 <script data-ad-client="ca-pub-2485404446552133" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
 
-# Let your voice soar!
+# Let your voices soar!
 
 Autosync your tracks - mix your audio - produce a gridded video -
 no software to learn - works on any platform - 100% fast and free.
