@@ -54,30 +54,30 @@ def combine(names, samples, sync_offsets, mute_tracks,
             sample = sample.fade_in(1000)
         else:
             commands = suppress_list[i]
-            # print("commands:", commands)
+            print("commands:", commands)
             blend = 300         # ms
             seg = None
             start = 0
             for cmd in commands:
-                #print("command:", cmd)
+                print("command:", cmd)
                 (t0, t1) = cmd
                 ms0 = int(round(t0*1000))
                 ms1 = int(round(t1*1000))
-                #print("  start:", start, "range:", ms0, ms1)
+                print("  start:", start, "range:", ms0, ms1)
                 if ms1 - ms0 < 2*blend:
                     continue
                 if ms0 > start:
                     if start < blend:
                         clip = sample[start:ms0+blend]
-                        #print("clip:", start, ms0+blend)
+                        print("clip:", start, ms0+blend)
                     else:
                         clip = sample[start-blend:ms0+blend]
-                        #print("clip:", start-blend, ms0+blend)
+                        print("clip:", start-blend, ms0+blend)
                     if seg is None:
                         seg = clip
                     else:
                         seg = seg.append(clip, crossfade=blend)
-                #print("silent:", ms0, ms1)
+                print("silent:", ms0, ms1)
                 clip = AudioSegment.silent(duration=ms1-ms0)
                 if seg is None:
                     seg = clip
@@ -86,8 +86,14 @@ def combine(names, samples, sync_offsets, mute_tracks,
                 start = ms1
             # catch the last segment
             if start < len(sample) - blend:
-                clip = sample[start-blend:]
-                seg = seg.append(clip, crossfade=blend)
+                if start == 0:
+                    clip = sample[start:]
+                else:
+                    clip = sample[start-blend:]
+                if seg is None:
+                    seg = clip
+                else:
+                    seg = seg.append(clip, crossfade=blend)
             #print("lengths:", len(sample), len(seg))
             sample = seg
         sr = sample.frame_rate
@@ -101,7 +107,6 @@ def combine(names, samples, sync_offsets, mute_tracks,
         synced_sample = synced_sample[:duration_ms]
         synced_sample = synced_sample.fade_out(1000)
         samples[i] = synced_sample
-        log("notice: overwriting original sample with aligned version")
         
         y = np.array(synced_sample.get_array_of_samples()).astype('double')
         print(i, "max:", np.max(y))
