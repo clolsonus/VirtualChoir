@@ -132,7 +132,7 @@ class SampleGroup():
                         env.append( [times[j], 0] )
                     elif active:
                         # just entered a dead spot
-                        #print(" active:", active, start, end)
+                        print(" active:", active, start, end)
                         env.append( [times[j], 1] )
                         start = j
                     active = False
@@ -144,21 +144,20 @@ class SampleGroup():
                         # just entered a live spot
                         commands.append([times[start], times[end]])
                         # shape the dead spot env
-                        if end - start >= 3:
-                            #print(" active:", active, start, end)
-                            if (end - start)*dt >= 0.2:
-                                p1 = start + int(round(0.1/dt))
-                                p2 = end - int(round(0.1/dt))
-                                env.append( [times[p1], 0] )
-                                env.append( [times[p2], 0] )
-                            else:
-                                mid = int((end + start)*0.5)
-                                env.append( [times[mid], 0] )
-                            env.append( [times[end], 1] )
-                            start = j
+                        print(" active:", active, start, end)
+                        if (end - start)*dt >= 0.2:
+                            p1 = start + int(round(0.1/dt))
+                            p2 = end - int(round(0.1/dt))
+                            env.append( [times[p1], 0] )
+                            env.append( [times[p2], 0] )
+                        else:
+                            mid = int((end + start)*0.5)
+                            env.append( [times[mid], 0] )
+                        env.append( [times[end], 1] )
+                        start = j
                     active = True
                 end = j
-            #print(" active:", active, start, end)
+            print(" active:", active, start, end)
             if active:
                 env.append( [times[end], 1] )
             else:
@@ -168,7 +167,7 @@ class SampleGroup():
                 env.append( [times[end], 0] )
             #print(env)
             self.envelope_list.append(env)
-            #print(commands)
+            print(commands)
             self.suppress_list.append(commands)
             
     def compute_margins(self):
