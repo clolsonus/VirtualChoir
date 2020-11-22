@@ -37,6 +37,10 @@ def gen_dicts(fps, quality="sane"):
 class VideoTrack:
     def __init__(self):
         self.reader = None
+        self.place_x = 0
+        self.place_y = 0
+        self.size_w = 0
+        self.size_h = 0
 
     def open(self, file):
         print("video:", file)
@@ -283,13 +287,15 @@ def render_combined_video(project, results_dir,
     inputdict, outputdict = gen_dicts(output_fps, "sane")
     writer = skvideo.io.FFmpegWriter(output_file, inputdict=inputdict, outputdict=outputdict)
     done = False
-    frames = [None] * len(videos)
+    raw_frames = [None] * len(videos)
+    shaped_frames = [None] * len(videos)
     output_time = 0
     pbar = tqdm(total=int(duration*output_fps), smoothing=0.05)
     while output_time <= duration:
+        # fetch/update the frames for the current time step
         for i, v in enumerate(videos):
             if v is None:
-                frames[i] = None
+                raw_frames[i] = None
                 continue
             frame = v.get_frame(output_time - offsets[i])
             if not frame is None:
@@ -306,61 +312,87 @@ def render_combined_video(project, results_dir,
                         frame = cv2.flip(frame, 0)
                     else:
                         print("unhandled rotation angle:", rotate_hints[video_names[i]])
+            raw_frames[i] = frame
+
+        # compute placement/size for each frame (static grid strategy)
+        row = 0
+        col = 0
+        for i in range(len(videos)):
+            v = videos[i]
+            frame = raw_frames[i]
+            if v.frame is None:
+                continue
+            x = int(round(border + col * (cell_w + border)))
+            y = int(round(border + row * (cell_h + border)))
+            if frame.shape[1] < cell_w:
+                gap = (cell_w - frame.shape[1]) * 0.5
+                x += int(gap)
+            if frame.shape[0] < cell_h:
+                gap = (cell_h - frame.shape[0]) * 0.5
+                y += int(gap)
+            v.place_x = x
+            v.place_y = y
+            v.size_w = cell_w
+            v.size_h = cell_h
+            col += 1
+            if col >= cols:
+                col = 0
+                row += 1
+                
+        # scale/fit each frame to it's cell size
+        for i in range(len(videos)):
+            v = videos[i]
+            frame = raw_frames[i]
+            if not frame is None:
                 (h, w) = frame.shape[:2]
                 vid_aspect = w/h
                 vid_landscape = (vid_aspect >= 1)
-                scale_w = cell_w / w
-                scale_h = cell_h / h
+                scale_w = v.size_w / w
+                scale_h = v.size_h / h
                 
                 #option = "fit"
                 option = "zoom"
                 background = None
                 if option == "fit":
-                    frames[i] = get_fit(frame, scale_w, scale_h)
+                    shaped_frames[i] = get_fit(frame, scale_w, scale_h)
                 elif option == "zoom":
                     if cell_landscape != vid_landscape:
                         # background/wings full zoom
                         background = get_zoom(frame, scale_w, scale_h)
                         background = cv2.blur(background, (43, 43))
-                        background = clip_frame(background, cell_w, cell_h)
+                        background = clip_frame(background,
+                                                v.size_w, v.size_h)
                         # foreground compromise zoom/fit/arrangement
                         avg = (scale_w + scale_h) * 0.5
                         scale_w = avg
                         scale_h = avg
                         #print("scale:", scale_w, scale_h)
                     frame_scale = get_zoom(frame, scale_w, scale_h)
-                    frame_scale = clip_frame(frame_scale, cell_w, cell_h)
+                    frame_scale = clip_frame(frame_scale, v.size_w, v.size_h)
                     if background is None:
-                        frames[i] = frame_scale
+                        shaped_frames[i] = frame_scale
                     else:
-                        frames[i] = overlay_frames(background, frame_scale)
+                        shaped_frames[i] = overlay_frames(background, frame_scale)
                 # cv2.imshow(video_names[i], frame_scale)
-            elif not frames[i] is None:
+            elif not shaped_frames[i] is None:
                 # fade
-                frames[i] = (frames[i] * 0.9).astype('uint8')
+                shaped_frames[i] = (shaped_frames[i] * 0.9).astype('uint8')
             else:
                 # bummer video with no frames?
-                frames[i] = None
+                shaped_frames[i] = None
+
+        # draw the main frame
         main_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
 
-        row = 0
-        col = 0
-        for i, f in enumerate(frames):
-            if f is None:
+        # place each frame
+        for i in range(len(videos)):
+            v = videos[i]
+            frame = shaped_frames[i]
+            if frame is None:
                 continue
-            x = int(round(border + col * (cell_w + border)))
-            y = int(round(border + row * (cell_h + border)))
-            if f.shape[1] < cell_w:
-                gap = (cell_w - f.shape[1]) * 0.5
-                x += int(gap)
-            if f.shape[0] < cell_h:
-                gap = (cell_h - f.shape[0]) * 0.5
-                y += int(gap)
-            main_frame[y:y+f.shape[0],x:x+f.shape[1]] = f
-            col += 1
-            if col >= cols:
-                col = 0
-                row += 1
+            x = v.place_x
+            y = v.place_y
+            main_frame[y:y+frame.shape[0],x:x+frame.shape[1]] = frame
         #cv2.imshow("main", main_frame)
 
         if title_page and output_time <= 5:
