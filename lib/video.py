@@ -9,6 +9,7 @@ from subprocess import call
 from tqdm import tqdm
 
 from .logger import log
+from .video_grid import VideoGrid
 
 def gen_dicts(fps, quality="sane"):
     inputdict = {
@@ -37,10 +38,11 @@ def gen_dicts(fps, quality="sane"):
 class VideoTrack:
     def __init__(self):
         self.reader = None
-        self.place_x = 0
-        self.place_y = 0
+        self.place_x = None
+        self.place_y = None
         self.size_w = 0
         self.size_h = 0
+        self.sort_order = 0
 
     def open(self, file):
         print("video:", file)
@@ -69,6 +71,8 @@ class VideoTrack:
         self.total_frames = int(round(self.duration * self.fps))
         self.frame_counter = -1
         self.frame = []
+        self.raw_frame = None
+        self.shaped_frame = None
 
         print('fps:', self.fps)
         print('codec:', codec)
@@ -87,12 +91,13 @@ class VideoTrack:
         frame_num = int(round(time * self.fps))
         # print("request frame num:", frame_num)
         if frame_num < 0:
-            if self.frame is None:
-                return np.zeros(shape=[self.h, self.w, 3], dtype=np.uint8)
-            else:
-                (h, w) = self.frame.shape[:2]
-                return np.zeros(shape=[h, w, 3],
-                                dtype=np.uint8)
+            return None
+            # if self.frame is None:
+            #     return np.zeros(shape=[self.h, self.w, 3], dtype=np.uint8)
+            # else:
+            #     (h, w) = self.frame.shape[:2]
+            #     return np.zeros(shape=[h, w, 3],
+            #                     dtype=np.uint8)
         while self.frame_counter < frame_num and not self.frame is None:
             try:
                 self.frame = self.reader._readFrame()
@@ -241,61 +246,20 @@ def render_combined_video(project, results_dir,
     if len(videos) == 0:
         return
 
-    # plan our grid
-    num_portrait = 0
-    num_landscape = 0
-    for v in videos:
-        if v is None or v.frame is None:
-            continue
-        (h, w) = v.frame.shape[:2]
-        if w > h:
-            num_landscape += 1
-        else:
-            num_portrait += 1
-    cell_landscape = True
-    if num_portrait > num_landscape:
-        cell_landscape = False
-        log("portrait dominant input videos")
-    else:
-        log("landscape dominant input videos")
-
-    num_good_videos = sum(v is not None for v in videos)
-    cols = 1
-    rows = 1
-    while cols * rows < num_good_videos:
-        if cell_landscape:
-            if cols <= rows:
-                cols += 1
-            else:
-                rows += 1
-        else:
-            if cols < rows*4:
-                cols += 1
-            else:
-                rows += 1
-    log("video grid (rows x cols):", rows, "x", cols)
-    grid_w = int(output_w / cols)
-    grid_h = int(output_h / rows)
-    cell_w = (output_w - border*(cols+1)) / cols
-    cell_h = (output_h - border*(rows+1)) / rows
-    cell_aspect = cell_w / cell_h
-    print("  grid size:", grid_w, "x", grid_h)
-    print("  cell size:", cell_w, "x", cell_h, "aspect:", cell_aspect)
+    # plan and setup the grid
+    grid = VideoGrid(videos, output_w, output_h, border)
     
     # open writer for output
     output_file = os.path.join(results_dir, "silent_video.mp4")
     inputdict, outputdict = gen_dicts(output_fps, "sane")
     writer = skvideo.io.FFmpegWriter(output_file, inputdict=inputdict, outputdict=outputdict)
     done = False
-    raw_frames = [None] * len(videos)
-    shaped_frames = [None] * len(videos)
     output_time = 0
     pbar = tqdm(total=int(duration*output_fps), smoothing=0.05)
     while output_time <= duration:
         # fetch/update the frames for the current time step
         for i, v in enumerate(videos):
             if v is None:
-                raw_frames[i] = None
                 continue
             frame = v.get_frame(output_time - offsets[i])
             if not frame is None:
@@ -312,37 +276,15 @@ def render_combined_video(project, results_dir,
                         frame = cv2.flip(frame, 0)
                     else:
                         print("unhandled rotation angle:", rotate_hints[video_names[i]])
-            raw_frames[i] = frame
+            v.raw_frame = frame
 
-        # compute placement/size for each frame (static grid strategy)
-        row = 0
-        col = 0
-        for i in range(len(videos)):
-            v = videos[i]
-            frame = raw_frames[i]
-            if v.frame is None:
-                continue
-            x = int(round(border + col * (cell_w + border)))
-            y = int(round(border + row * (cell_h + border)))
-            if frame.shape[1] < cell_w:
-                gap = (cell_w - frame.shape[1]) * 0.5
-                x += int(gap)
-            if frame.shape[0] < cell_h:
-                gap = (cell_h - frame.shape[0]) * 0.5
-                y += int(gap)
-            v.place_x = x
-            v.place_y = y
-            v.size_w = cell_w
-            v.size_h = cell_h
-            col += 1
-            if col >= cols:
-                col = 0
-                row += 1
+        # compute placement/size for each video frame (static grid strategy)
+        grid.update(videos)
                 
         # scale/fit each frame to it's cell size
         for i in range(len(videos)):
             v = videos[i]
-            frame = raw_frames[i]
+            frame = v.raw_frame
             if not frame is None:
                 (h, w) = frame.shape[:2]
                 vid_aspect = w/h
@@ -354,9 +296,9 @@ def render_combined_video(project, results_dir,
                 option = "zoom"
                 background = None
                 if option == "fit":
-                    shaped_frames[i] = get_fit(frame, scale_w, scale_h)
+                    v.shaped_frame = get_fit(frame, scale_w, scale_h)
                 elif option == "zoom":
-                    if cell_landscape != vid_landscape:
+                    if grid.cell_landscape != vid_landscape:
                         # background/wings full zoom
                         background = get_zoom(frame, scale_w, scale_h)
                         background = cv2.blur(background, (43, 43))
@@ -370,30 +312,29 @@ def render_combined_video(project, results_dir,
                     frame_scale = get_zoom(frame, scale_w, scale_h)
                     frame_scale = clip_frame(frame_scale, v.size_w, v.size_h)
                     if background is None:
-                        shaped_frames[i] = frame_scale
+                        v.shaped_frame = frame_scale
                     else:
-                        shaped_frames[i] = overlay_frames(background, frame_scale)
+                        v.shaped_frame = overlay_frames(background, frame_scale)
                 # cv2.imshow(video_names[i], frame_scale)
-            elif not shaped_frames[i] is None:
+            elif not v.shaped_frame is None:
                 # fade
-                shaped_frames[i] = (shaped_frames[i] * 0.9).astype('uint8')
+                v.shaped_frame = (v.shaped_frame * 0.9).astype('uint8')
             else:
                 # bummer video with no frames?
-                shaped_frames[i] = None
+                v.shaped_frame = None
 
         # draw the main frame
         main_frame = np.zeros(shape=[output_h, output_w, 3], dtype=np.uint8)
 
         # place each frame
-        for i in range(len(videos)):
-            v = videos[i]
-            frame = shaped_frames[i]
+        sorted_vids = sorted(videos, key=lambda x: x.sort_order)
+        for v in sorted_vids:
+            frame = v.shaped_frame
             if frame is None:
                 continue
             x = v.place_x
             y = v.place_y
             main_frame[y:y+frame.shape[0],x:x+frame.shape[1]] = frame
-        #cv2.imshow("main", main_frame)
 
         if title_page and output_time <= 5:
             if output_time < 4:
