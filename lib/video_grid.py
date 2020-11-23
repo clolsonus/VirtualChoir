@@ -53,13 +53,17 @@ class VideoGrid:
         # compute placement/size for each frame (static grid strategy)
         row = 0
         col = 0
+        if self.cols >= 2 and self.rows >= 2:
+            random_start = True
+        else:
+            random_start = False
         for v in videos:
             frame = v.raw_frame
             if v.frame is None:
                 continue
             if v.raw_frame is None:
                 pass
-            elif v.place_x == None or v.place_y == None:
+            elif random_start and (v.place_x == None or v.place_y == None):
                 # first appears, place in a random location
                 v.place_x = random.randrange(self.output_w - int(self.cell_w))
                 v.place_y = random.randrange(self.output_h - int(self.cell_h))
@@ -75,10 +79,14 @@ class VideoGrid:
                 if frame.shape[0] < self.cell_h:
                     gap = (self.cell_h - frame.shape[0]) * 0.5
                     y += int(gap)
-                dx = x - v.place_x
-                dy = y - v.place_y
-                v.place_x = x - int(dx * 0.8)
-                v.place_y = y - int(dy * 0.8)
+                if v.place_x is None or v.place_y is None:
+                    v.place_x = x
+                    v.place_y = y
+                else:
+                    dx = x - v.place_x
+                    dy = y - v.place_y
+                    v.place_x = x - int(dx * 0.8)
+                    v.place_y = y - int(dy * 0.8)
             v.size_w = self.cell_w
             v.size_h = self.cell_h
             col += 1
