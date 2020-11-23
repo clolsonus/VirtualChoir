@@ -137,14 +137,14 @@ def run_job(settings, request):
     if len(request['Additional Options']):
         options = request['Additional Options'].split(", ")
         for o in options:
-            if o.startswith("Only audio"):
+            if o.lower().startswith("only audio"):
                 audio_only = True
                 command.append("--no-video")
-            elif o.startswith("Suppress noise"):
+            elif o.lower().startswith("suppress noise"):
                 command.append("--suppress-noise")
-            elif o.startswith("Mute videos"):
+            elif o.lower().startswith("mute videos"):
                 command.append("--mute-videos")
-            elif o.startswith("Make individual time aligned tracks"):
+            elif o.lower().startswith("make individual time aligned tracks"):
                 aligned_tracks = True
                 command.append("--write-aligned-tracks")
     print("Running command:", command)
