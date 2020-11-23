@@ -348,7 +348,7 @@ def render_combined_video(project, resolution, results_dir,
             if frame is None:
                 continue
             nf = frame.copy()
-            x = v.place_x
+            x = int(v.place_x)
             if x < 0:
                 diff = -x
                 if diff >= nf.shape[1]:
@@ -356,13 +356,13 @@ def render_combined_video(project, resolution, results_dir,
                 else:
                     nf = nf[:,diff:]
                     x = 0
-            if x >= output_w - nf.shape[1]:
+            if x > output_w - nf.shape[1]:
                 diff = x - (output_w - nf.shape[1])
                 if diff >= nf.shape[1]:
                     continue
                 else:
                     nf = nf[:,:-diff]
-            y = v.place_y
+            y = int(v.place_y)
             #print("y:", y, "shape:", nf.shape[:2])
             if y < 0:
                 diff = -y

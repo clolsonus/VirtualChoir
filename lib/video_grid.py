@@ -9,6 +9,8 @@ class VideoGrid:
         self.output_h = output_h
         self.border = border
         self.place_count = 0
+        self.odd_offset = 0
+        self.even_offset = self.output_w
         num_portrait = 0
         num_landscape = 0
         for v in videos:
@@ -53,41 +55,59 @@ class VideoGrid:
         # compute placement/size for each frame (static grid strategy)
         row = 0
         col = 0
+        if self.odd_offset >= 0:
+            self.odd_offset = 0
+        if self.even_offset < self.output_w:
+            self.even_offset = self.output_w
+        max_step = self.output_w * 0.015
         if self.cols >= 2 and self.rows >= 2:
             random_start = True
         else:
             random_start = False
         for v in videos:
             frame = v.raw_frame
+
+            # target grid location
+            x = self.border + col * (self.cell_w + self.border)
+            y = self.border + row * (self.cell_h + self.border)
+
             if frame is None:
                 pass
-            elif random_start and (v.place_x == None or v.place_y == None):
-                # first appears, place in a random location
-                v.place_x = random.randrange(self.output_w - int(self.cell_w))
-                v.place_y = random.randrange(self.output_h - int(self.cell_h))
-                v.sort_order = self.place_count
-                self.place_count += 1
             else:
-                # update location
-                x = int(round(self.border + col * (self.cell_w + self.border)))
-                y = int(round(self.border + row * (self.cell_h + self.border)))
                 if frame.shape[1] < self.cell_w:
                     gap = (self.cell_w - frame.shape[1]) * 0.5
-                    x += int(gap)
+                    x += gap
                 if frame.shape[0] < self.cell_h:
                     gap = (self.cell_h - frame.shape[0]) * 0.5
-                    y += int(gap)
+                    y += gap
                 if v.place_x is None or v.place_y is None:
-                    v.place_x = x
-                    v.place_y = y
+                    self.place_count += 1
+                    v.sort_order = self.place_count
+                    if v.place_x is None:
+                        if row % 2 == 0:
+                            v.place_x = self.even_offset
+                            self.even_offset += (self.cell_w + self.border)
+                        else:
+                            self.odd_offset -= self.cell_w
+                            v.place_x = self.odd_offset
+                            self.odd_offset -= self.border
+                    if v.place_y is None:
+                        v.place_y = y
                 else:
-                    dx = x - v.place_x
-                    dy = y - v.place_y
-                    v.place_x = x - int(dx * 0.8)
-                    v.place_y = y - int(dy * 0.8)
+                    dx = (x - v.place_x) * 0.2
+                    dy = (y - v.place_y) * 0.2
+                    if dx > max_step: dx = max_step
+                    if dx < -max_step: dx = -max_step
+                    if dy > max_step: dy = max_step
+                    if dy < -max_step: dy = -max_step
+                    v.place_x += dx
+                    v.place_y += dy
             v.size_w = self.cell_w
             v.size_h = self.cell_h
             col += 1
             if col >= self.cols:
                 col = 0
                 row += 1
+        # outside videos loop!
+        self.odd_offset += max_step
+        self.even_offset -= max_step

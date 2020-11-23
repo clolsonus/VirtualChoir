@@ -209,7 +209,7 @@ if args.mute_videos:
 else:
     mute_tracks = []
 mixed = mixer.combine(audio_tracks, audio_group.sample_list, sync_offsets,
-                      mute_tracks, gain_hints=gain_hints, pan_range=0.25,
+                      mute_tracks, gain_hints=gain_hints, pan_range=0.3,
                       suppress_list=audio_group.suppress_list)
 group_file = os.path.join(results_dir, "mixed_audio.mp3")
 log("Mixed audio file: mixed_audio.mp3")
