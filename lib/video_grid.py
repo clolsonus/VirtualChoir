@@ -49,7 +49,7 @@ class VideoGrid:
         print("  grid size:", self.grid_w, "x", self.grid_h)
         print("  cell size:", self.cell_w, "x", self.cell_h, "aspect:", cell_aspect)
 
-    def update(self, videos):
+    def update(self, videos, output_time):
         # compute placement/size for each frame (static grid strategy)
         row = 0
         col = 0
@@ -59,9 +59,7 @@ class VideoGrid:
             random_start = False
         for v in videos:
             frame = v.raw_frame
-            if v.frame is None:
-                continue
-            if v.raw_frame is None:
+            if frame is None:
                 pass
             elif random_start and (v.place_x == None or v.place_y == None):
                 # first appears, place in a random location
