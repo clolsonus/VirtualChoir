@@ -24,6 +24,9 @@ parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
 parser.add_argument('--reference', help='file name of declared refrence track')
 parser.add_argument('--suppress-noise', action='store_true', help='try to suppress extraneous noises.')
 parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
+parser.add_argument('--resolution', default='1080p',
+                    choices=['480p', '720p', '1080p', '1440p'],
+                    help='video output resolution')
 parser.add_argument('--no-video', action='store_true', help='skip the video production.')
 parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
 
@@ -226,7 +229,7 @@ if len(video_tracks) and not args.no_video:
         print(track, ai, -sync_offsets[ai] / 1000)
         video_offsets.append( -sync_offsets[ai] / 1000 )
     # render the new combined video
-    video.render_combined_video( args.project, results_dir,
+    video.render_combined_video( args.project, args.resolution, results_dir,
                                  video_tracks, video_offsets,
                                  rotate_hints=rotate_hints,
                                  title_page=title_page,

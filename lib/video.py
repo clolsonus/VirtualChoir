@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from .logger import log
 from .video_grid import VideoGrid
+from .video_spiral import VideoSpiral
 
 def gen_dicts(fps, quality="sane"):
     inputdict = {
@@ -86,18 +87,13 @@ class VideoTrack:
             log("warning: no first frame in:", file)
         return True
 
-    def get_frame(self, time):
+    def get_frame(self, time, rotate=0):
         # return the frame closest to the requested time
         frame_num = int(round(time * self.fps))
         # print("request frame num:", frame_num)
         if frame_num < 0:
-            return None
-            # if self.frame is None:
-            #     return np.zeros(shape=[self.h, self.w, 3], dtype=np.uint8)
-            # else:
-            #     (h, w) = self.frame.shape[:2]
-            #     return np.zeros(shape=[h, w, 3],
-            #                     dtype=np.uint8)
+            self.raw_frame = None
+            return
         while self.frame_counter < frame_num and not self.frame is None:
             try:
                 self.frame = self.reader._readFrame()
@@ -107,8 +103,25 @@ class VideoTrack:
                     self.frame = None
             except:
                 self.frame = None
-        return self.frame
-        
+                
+        if self.frame is not None:
+            if rotate == 0:
+                self.raw_frame = self.frame
+            elif rotate == 90:
+                tmp = cv2.transpose(self.frame)
+                self.raw_frame = cv2.flip(tmp, 1)
+            elif rotate == 180:
+                self.raw_frame = cv2.flip(self.frame, -1)
+            elif rotate == 270:
+                tmp = cv2.transpose(self.frame)
+                self.raw_frame = cv2.flip(tmp, 0)
+            else:
+                print("unhandled rotation angle:", rotate)
+        else:
+            # no more frames, impliment a simple fade out
+            if self.raw_frame is not None:
+                self.raw_frame = (self.shaped_frame * 0.9).astype('uint8')
+
     def skip_secs(self, seconds):
         if not self.reader:
             return
@@ -173,12 +186,25 @@ def overlay_frames(bg, fg):
 
 # fixme: figure out why zooming on some landscape videos in some cases
 #        doesn't always fill the grid cell (see Coeur, individual grades.) 
-def render_combined_video(project, results_dir,
+def render_combined_video(project, resolution, results_dir,
                           video_names, offsets, rotate_hints={},
                           title_page=None, credits_page=None):
-    # 1080p
-    output_w = 1920
-    output_h = 1080
+    if resolution == '480p':
+        output_w = 854
+        output_h = 480
+    elif resolution == '720p':
+        output_w = 1280
+        output_h = 720
+    elif resolution == '1080p':
+        output_w = 1920
+        output_h = 1080
+    elif resolution == '1440p':
+        output_w = 2560
+        output_h = 1440
+    else:
+        log("Unknown video resolution request:", resolution)
+        output_w = 1920
+        output_h = 1080
     output_fps = 30
     border = 10
     log("output video specs:", output_w, "x", output_h, "fps:", output_fps)
@@ -248,6 +274,7 @@ def render_combined_video(project, results_dir,
 
     # plan and setup the grid
     grid = VideoGrid(videos, output_w, output_h, border)
+    #spiral = VideoSpiral(videos, output_w, output_h, border)
     
     # open writer for output
     output_file = os.path.join(results_dir, "silent_video.mp4")
@@ -261,25 +288,16 @@ def render_combined_video(project, results_dir,
         for i, v in enumerate(videos):
             if v is None:
                 continue
-            frame = v.get_frame(output_time - offsets[i])
-            if not frame is None:
-                basevid = os.path.basename(video_names[i])
-                #print("basevid:", basevid)
-                if basevid in rotate_hints:
-                    if rotate_hints[basevid] == 90:
-                        frame = cv2.transpose(frame)
-                        frame = cv2.flip(frame, 1)
-                    elif rotate_hints[basevid] == 180:
-                        frame = cv2.flip(frame, -1)
-                    elif rotate_hints[basevid] == 270:
-                        frame = cv2.transpose(frame)
-                        frame = cv2.flip(frame, 0)
-                    else:
-                        print("unhandled rotation angle:", rotate_hints[video_names[i]])
-            v.raw_frame = frame
+            basevid = os.path.basename(video_names[i])
+            #print("basevid:", basevid)
+            rotate = 0
+            if basevid in rotate_hints:
+                rotate = rotate_hints[basevid]
+            v.get_frame(output_time - offsets[i], rotate)
 
         # compute placement/size for each video frame (static grid strategy)
-        grid.update(videos)
+        grid.update(videos, output_time)
+        #spiral.update(videos, output_time)
                 
         # scale/fit each frame to it's cell size
         for i in range(len(videos)):
@@ -316,9 +334,6 @@ def render_combined_video(project, results_dir,
                     else:
                         v.shaped_frame = overlay_frames(background, frame_scale)
                 # cv2.imshow(video_names[i], frame_scale)
-            elif not v.shaped_frame is None:
-                # fade
-                v.shaped_frame = (v.shaped_frame * 0.9).astype('uint8')
             else:
                 # bummer video with no frames?
                 v.shaped_frame = None
@@ -332,9 +347,37 @@ def render_combined_video(project, results_dir,
             frame = v.shaped_frame
             if frame is None:
                 continue
+            nf = frame.copy()
             x = v.place_x
+            if x < 0:
+                diff = -x
+                if diff >= nf.shape[1]:
+                    continue
+                else:
+                    nf = nf[:,diff:]
+                    x = 0
+            if x >= output_w - nf.shape[1]:
+                diff = x - (output_w - nf.shape[1])
+                if diff >= nf.shape[1]:
+                    continue
+                else:
+                    nf = nf[:,:-diff]
             y = v.place_y
-            main_frame[y:y+frame.shape[0],x:x+frame.shape[1]] = frame
+            #print("y:", y, "shape:", nf.shape[:2])
+            if y < 0:
+                diff = -y
+                if diff >= nf.shape[0]:
+                    continue
+                else:
+                    nf = nf[diff:,:]
+                    y = 0
+            if y >= output_h - nf.shape[0]:
+                diff = y - (output_h - nf.shape[0])
+                if diff >= nf.shape[0]:
+                    continue
+                else:
+                    nf = nf[:-diff,:]
+            main_frame[y:y+nf.shape[0],x:x+nf.shape[1]] = nf
 
         if title_page and output_time <= 5:
             if output_time < 4:
