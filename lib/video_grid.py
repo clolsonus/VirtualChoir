@@ -11,10 +11,11 @@ class VideoGrid:
         self.place_count = 0
         self.odd_offset = 0
         self.even_offset = self.output_w
+        self.last_placed_row = 0
         num_portrait = 0
         num_landscape = 0
         for v in videos:
-            if v is None or v.frame is None:
+            if v.reader is None or v.frame is None:
                 continue
             (h, w) = v.frame.shape[:2]
             if w > h:
@@ -28,7 +29,7 @@ class VideoGrid:
         else:
             log("landscape dominant input videos")
 
-        num_good_videos = sum(v is not None for v in videos)
+        num_good_videos = sum(v.reader is not None for v in videos)
         self.cols = 1
         self.rows = 1
         while self.cols * self.rows < num_good_videos:
@@ -59,32 +60,34 @@ class VideoGrid:
             self.odd_offset = 0
         if self.even_offset < self.output_w:
             self.even_offset = self.output_w
-        max_step = self.output_w * 0.015
+        max_step = self.output_w * 0.010
         if self.cols >= 2 and self.rows >= 2:
             random_start = True
         else:
             random_start = False
-        for v in videos:
-            frame = v.raw_frame
-
-            # target grid location
-            x = self.border + col * (self.cell_w + self.border)
-            y = self.border + row * (self.cell_h + self.border)
-
-            if frame is None:
-                pass
-            else:
-                if frame.shape[1] < self.cell_w:
-                    gap = (self.cell_w - frame.shape[1]) * 0.5
-                    x += gap
-                if frame.shape[0] < self.cell_h:
-                    gap = (self.cell_h - frame.shape[0]) * 0.5
-                    y += gap
+        sorted_vids = sorted(videos, key=lambda x: x.sort_order)
+        for v in sorted_vids:
+            if v.reader is None:
+                continue
+            if v.raw_frame is not None:
+                frame = v.raw_frame
+                # target grid location
+                x = self.border + col * (self.cell_w + self.border)
+                y = self.border + row * (self.cell_h + self.border)
+                # if frame.shape[1] < self.cell_w:
+                #     gap = (self.cell_w - frame.shape[1]) * 0.5
+                #     x += gap
+                # if frame.shape[0] < self.cell_h:
+                #     gap = (self.cell_h - frame.shape[0]) * 0.5
+                #     y += gap
                 if v.place_x is None or v.place_y is None:
                     self.place_count += 1
                     v.sort_order = self.place_count
+                    if row > self.last_placed_row:
+                        self.last_placed_row = row
+                        self.even_offset = self.output_w
                     if v.place_x is None:
-                        if row % 2 == 0:
+                        if True or row % 2 == 0:
                             v.place_x = self.even_offset
                             self.even_offset += (self.cell_w + self.border)
                         else:
@@ -102,12 +105,13 @@ class VideoGrid:
                     if dy < -max_step: dy = -max_step
                     v.place_x += dx
                     v.place_y += dy
-            v.size_w = self.cell_w
-            v.size_h = self.cell_h
-            col += 1
-            if col >= self.cols:
-                col = 0
-                row += 1
+                v.size_w = self.cell_w
+                v.size_h = self.cell_h
+                col += 1
+                if col >= self.cols:
+                    col = 0
+                    row += 1
+
         # outside videos loop!
         self.odd_offset += max_step
         self.even_offset -= max_step
