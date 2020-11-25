@@ -99,31 +99,39 @@ if aup_project:
     print("audacity project for sync:", aup_project)
 
 hints_file = os.path.join(args.project, "hints.txt")
-gain_hints = {}
-rotate_hints = {}
+hints = {}
+#gain_hints = {}
+#rotate_hints = {}
 if os.path.exists(hints_file):
     log("Found a hints.txt file, loading...")
     with open(hints_file, 'r') as fp:
         reader = csv.reader(fp, delimiter=' ', skipinitialspace=True)
         for row in reader:
             print("|".join(row))
-            if len(row) < 2:
-                print("bad hint.txt syntax:", row)
+            if len(row) < 3:
+                log("bad hint.txt syntax:", row)
                 continue
             name = row[0]
+            if not name in hints:
+                hints[name] = {}
             hint = row[1]
-            if hint == "gain":
-                if len(row) == 3:
-                    gain_hints[name] = float(row[2])
-                else:
-                    print("bad hint.txt syntax:", row)
-            elif hint == "rotate":
-                if len(row) == 3:
-                    rotate_hints[name] = int(row[2])
-                else:
-                    print("bad hint.txt syntax:", row)
+            if hint == "gain" or hint == "rotate" or hint == "video_shift":
+                hints[name][hint] = float(row[2])
             else:
-                print("hint unknown (or typo):", row)
+                log("unknwon hint in hint.txt:", row)
+                
+            # if hint == "gain":
+            #     if len(row) == 3:
+            #         gain_hints[name] = float(row[2])
+            #     else:
+            #         print("bad hint.txt syntax:", row)
+            # elif hint == "rotate":
+            #     if len(row) == 3:
+            #         rotate_hints[name] = int(row[2])
+            #     else:
+            #         print("bad hint.txt syntax:", row)
+            # else:
+            #     print("hint unknown (or typo):", row)
 else:
     log("no hints file found.")
     
@@ -209,7 +217,7 @@ if args.mute_videos:
 else:
     mute_tracks = []
 mixed = mixer.combine(audio_tracks, audio_group.sample_list, sync_offsets,
-                      mute_tracks, gain_hints=gain_hints, pan_range=0.3,
+                      mute_tracks, hints=hints, pan_range=0.3,
                       suppress_list=audio_group.suppress_list)
 group_file = os.path.join(results_dir, "mixed_audio.mp3")
 log("Mixed audio file: mixed_audio.mp3")
@@ -231,7 +239,7 @@ if len(video_tracks) and not args.no_video:
     # render the new combined video
     video.render_combined_video( args.project, args.resolution, results_dir,
                                  video_tracks, video_offsets,
-                                 rotate_hints=rotate_hints,
+                                 hints=hints,
                                  title_page=title_page,
                                  credits_page=credits_page )
     video.merge( results_dir )
