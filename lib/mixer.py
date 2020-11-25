@@ -7,7 +7,7 @@ import random
 from .logger import log
 
 def combine(names, samples, sync_offsets, mute_tracks,
-            gain_hints={}, pan_range=0, suppress_list=None):
+            hints={}, pan_range=0, suppress_list=None):
     durations_ms = []
     for i, sample in enumerate(samples):
         # print(names[i], len(sample) / 1000, sync_offsets[i])
@@ -36,8 +36,9 @@ def combine(names, samples, sync_offsets, mute_tracks,
         if names[i] in mute_tracks:
             log("skipping muted:", names[i])
             continue
-        if os.path.basename(names[i]) in gain_hints:
-            track_gain = gain_hints[os.path.basename(names[i])]
+        basename = os.path.basename(names[i])
+        if basename in hints and "gain" in hints[basename]:
+            track_gain = hints[basename]["gain"]
         else:
             track_gain = 1.0
         mixed_count += track_gain
