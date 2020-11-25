@@ -43,7 +43,10 @@ class VideoTrack:
         self.place_y = None
         self.size_w = 0
         self.size_h = 0
-        self.sort_order = 0
+        self.sort_order = 999999
+        self.frame = []
+        self.raw_frame = None
+        self.shaped_frame = None
 
     def open(self, file):
         print("video:", file)
@@ -71,9 +74,6 @@ class VideoTrack:
             self.duration = 1
         self.total_frames = int(round(self.duration * self.fps))
         self.frame_counter = -1
-        self.frame = []
-        self.raw_frame = None
-        self.shaped_frame = None
 
         print('fps:', self.fps)
         print('codec:', codec)
@@ -187,7 +187,7 @@ def overlay_frames(bg, fg):
 # fixme: figure out why zooming on some landscape videos in some cases
 #        doesn't always fill the grid cell (see Coeur, individual grades.) 
 def render_combined_video(project, resolution, results_dir,
-                          video_names, offsets, rotate_hints={},
+                          video_names, offsets, hints={},
                           title_page=None, credits_page=None):
     if resolution == '480p':
         output_w = 854
@@ -259,12 +259,12 @@ def render_combined_video(project, resolution, results_dir,
         v = VideoTrack()
         path = os.path.join(project, file)
         if v.open(path):
-            videos.append(v)
             durations.append(v.duration + offsets[i])
-        else:
-            # don't render but we still need a placeholder so videos
-            # continue match offset time list by position
-            videos.append(None)
+        videos.append(v)
+        # else:
+        #     # don't render but we still need a placeholder so videos
+        #     # continue match offset time list by position
+        #     videos.append(None)
     duration = np.median(durations)
     duration += 4 # for credits/fade out
     log("median video duration (with fade to credits):", duration)
@@ -286,14 +286,18 @@ def render_combined_video(project, resolution, results_dir,
     while output_time <= duration:
         # fetch/update the frames for the current time step
         for i, v in enumerate(videos):
-            if v is None:
+            if v.reader is None:
                 continue
-            basevid = os.path.basename(video_names[i])
-            #print("basevid:", basevid)
+            basename = os.path.basename(video_names[i])
+            #print("basename:", basename)
             rotate = 0
-            if basevid in rotate_hints:
-                rotate = rotate_hints[basevid]
-            v.get_frame(output_time - offsets[i], rotate)
+            video_shift = 0
+            if basename in hints:
+                if "rotate" in hints[basename]:
+                    rotate = hints[basename]["rotate"]
+                if "video_shift" in hints[basename]:
+                    video_shift = hints[basename]["video_shift"]
+            v.get_frame(output_time - offsets[i] - video_shift, rotate)
 
         # compute placement/size for each video frame (static grid strategy)
         grid.update(videos, output_time)
@@ -302,6 +306,8 @@ def render_combined_video(project, resolution, results_dir,
         # scale/fit each frame to it's cell size
         for i in range(len(videos)):
             v = videos[i]
+            if v.reader is None:
+                continue
             frame = v.raw_frame
             if not frame is None:
                 (h, w) = frame.shape[:2]
