@@ -36,6 +36,9 @@ def combine(names, samples, sync_offsets, mute_tracks,
         if names[i] in mute_tracks:
             log("skipping muted:", names[i])
             continue
+        if sample is None:
+            log("empty sample")
+            continue
         basename = os.path.basename(names[i])
         if basename in hints and "gain" in hints[basename]:
             track_gain = hints[basename]["gain"]
