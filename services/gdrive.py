@@ -90,7 +90,7 @@ class gdrive():
                     # fall back guess, sorry
                     ext = "mp4"
             else:
-                ext = "totally_unknown"
+                return name
             print("Fix file extension:", name, "adding:", ext)
             return basename + "." + ext
             
