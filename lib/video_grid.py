@@ -91,14 +91,18 @@ class VideoGrid:
             animated_start = True
         else:
             animated_start = False
+        #num_good_videos = sum(v.reader is not None for v in videos)
+        #print("good:", num_good_videos)
         sorted_vids = sorted(videos, key=lambda x: x.sort_order)
+        #print("sorted:", len(sorted_vids))
         for v in sorted_vids:
+            if v.reader is None:
+                continue
+            #print(row, col)
             row_info = self.rows[row]
             cols = row_info["cols"]
             cell_w = row_info["cell_w"]
             cell_h = row_info["cell_h"]
-            if v.reader is None:
-                continue
             if v.raw_frame is not None:
                 frame = v.raw_frame
                 # target grid location

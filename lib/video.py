@@ -53,6 +53,7 @@ class VideoTrack:
         metadata = skvideo.io.ffprobe(file)
         #print(metadata.keys())
         if not "video" in metadata:
+            print("no video track")
             return False
         #print(json.dumps(metadata["video"], indent=4))
         fps_string = metadata['video']['@r_frame_rate']
