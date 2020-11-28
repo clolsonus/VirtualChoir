@@ -52,8 +52,9 @@ class VideoGrid:
                 if i % 2 != 0 and remainder > 0:
                     self.rows[i]["cols"] += 1
                     remainder -= 1
-            for i in range(self.num_rows):
-                # extend even rows next
+            for i in range(self.num_rows - 1, -1, -1):
+                # extend even rows next, but bottome up so there is
+                # more pattern at the top.
                 if i % 2 == 0 and remainder > 0:
                     self.rows[i]["cols"] += 1
                     remainder -= 1
