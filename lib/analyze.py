@@ -6,7 +6,6 @@ import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-#from pydub import playback
 from pydub import AudioSegment, scipy_effects # pip install pydub
 from tqdm import tqdm
 
@@ -16,6 +15,8 @@ hop_length = 512
 
 class SampleGroup():
     def __init__(self):
+        self.project = None
+        self.name_list = []
         self.sample_list = []
         self.raw_list = []
         self.onset_list = []
@@ -32,6 +33,8 @@ class SampleGroup():
 
     def load(self, project, name_list):
         log("loading audio tracks...")
+        self.project = project
+        self.name_list = name_list
         max_frame_rate = 0
         self.sample_list = []
         for track in name_list:
@@ -85,27 +88,56 @@ class SampleGroup():
                 base += hop_length
             self.intensity_list.append( np.array(intensity).astype('float') )
 
+    # return true if a is newer or same age than b, else false
+    def is_newer(self, a, b):
+        if os.path.exists(a) and os.path.exists(b):
+            stat_a = os.stat(a)
+            mtime_a = stat_a.st_mtime
+            stat_b = os.stat(b)
+            mtime_b = stat_b.st_mtime
+            if mtime_a >= mtime_b:
+                return True
+        return False
+
     def compute_clarities(self):
         print("Computing clarities...")
         self.clarity_list = []
         self.chroma_list = []
         for i, raw in enumerate(tqdm(self.raw_list)):
-            sr = self.sample_list[i].frame_rate
-            chroma = librosa.feature.chroma_cqt(y=np.array(raw).astype('float'),
-                                                sr=sr, hop_length=hop_length)
-            self.chroma_list.append(chroma)
-            a = len(self.time_list[i])
-            b = len(self.intensity_list[i])
-            c = chroma.shape[1]
-            min = np.min([a, b, c])
-            notes = np.zeros(min)
-            clarity = np.zeros(min)
-            imax = np.max(self.intensity_list[i])
-            for j in range(min):
-                notes[j] = np.argmax(chroma[:,j]) * (self.intensity_list[i][j] / imax)
-                clarity[j] = (chroma[:,j] < 0.2).sum() * self.intensity_list[i][j]
-            self.note_list.append(notes.T)
-            self.clarity_list.append(clarity.T)
+            # check cache
+            fullname = os.path.join(self.project, self.name_list[i])
+            name = os.path.basename(self.name_list[i])
+            basename, ext = os.path.splitext(name)
+            cachename = os.path.join(self.project, "cache",
+                                     "clarity_" + basename)
+            if self.is_newer(cachename, fullname):
+                # load from cache
+                #print("loading from cache:", cachename)
+                with open(cachename, "rb") as f:
+                    clarity = np.load(f)
+            else:
+                # compute
+                sr = self.sample_list[i].frame_rate
+                chroma = librosa.feature.chroma_cqt(y=np.array(raw).astype('float'),
+                                                    sr=sr, hop_length=hop_length)
+                self.chroma_list.append(chroma)
+                a = len(self.time_list[i])
+                b = len(self.intensity_list[i])
+                c = chroma.shape[1]
+                min = np.min([a, b, c])
+                notes = np.zeros(min)
+                clarity = np.zeros(min)
+                imax = np.max(self.intensity_list[i])
+                for j in range(min):
+                    notes[j] = np.argmax(chroma[:,j]) * (self.intensity_list[i][j] / imax)
+                    clarity[j] = (chroma[:,j] < 0.2).sum() * self.intensity_list[i][j]
+                self.note_list.append(notes.T)
+                clarity = clarity.T
+                # save in cache
+                #print("saving clarity as:", cachename)
+                with open(cachename, "wb") as f:
+                    np.save(f, clarity.T)
+            self.clarity_list.append(clarity)
 
     def compute_envelopes(self):
         self.envelope_list = []
