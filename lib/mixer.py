@@ -56,6 +56,8 @@ def combine(names, samples, sync_offsets, mute_tracks,
             sample = sample.pan( random.uniform(-pan_range, pan_range) )
         if suppress_list is None:
             sample = sample.fade_in(1000)
+        elif len(suppress_list[i]) == 0:
+            sample = sample.fade_in(1000)
         else:
             commands = suppress_list[i]
             print("commands:", commands)
