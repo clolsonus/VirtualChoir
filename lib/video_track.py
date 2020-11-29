@@ -88,7 +88,7 @@ class VideoTrack:
         else:
             # no more frames, impliment a simple fade out
             if self.raw_frame is not None:
-                self.raw_frame = (self.shaped_frame * 0.9).astype('uint8')
+                self.raw_frame = (self.raw_frame * 0.9).astype('uint8')
 
     def skip_secs(self, seconds):
         if not self.reader:
