@@ -109,7 +109,7 @@ class SampleGroup():
             name = os.path.basename(self.name_list[i])
             basename, ext = os.path.splitext(name)
             cachename = os.path.join(self.project, "cache",
-                                     "clarity_" + basename)
+                                     basename + ".clarity")
             if self.is_newer(cachename, fullname):
                 # load from cache
                 #print("loading from cache:", cachename)
