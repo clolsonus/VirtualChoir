@@ -54,12 +54,18 @@ def combine(names, samples, sync_offsets, mute_tracks,
         sample = sample.set_channels(2)
         if pan_range > 0.00001 and pan_range <= 1.0:
             sample = sample.pan( random.uniform(-pan_range, pan_range) )
-        if suppress_list is None:
-            sample = sample.fade_in(1000)
-        elif len(suppress_list[i]) == 0:
-            sample = sample.fade_in(1000)
-        else:
+        commands = []
+        if not suppress_list is None:
             commands = suppress_list[i]
+        # add hints (offset relative to track 0) to suppress list
+        if basename in hints and "suppress" in hints[basename]:
+            offset_sec = sync_offset/1000
+            print(hints[basename]["suppress"])
+            for cmd in hints[basename]["suppress"]:
+                print(cmd)
+                commands.append( (cmd[0]+offset_sec, cmd[1]+offset_sec) )
+        sample = sample.fade_in(1000)
+        if len(commands):
             print("commands:", commands)
             blend = 300         # ms
             seg = None
@@ -71,37 +77,18 @@ def combine(names, samples, sync_offsets, mute_tracks,
                 ms1 = int(round(t1*1000))
                 print("  start:", start, "range:", ms0, ms1)
                 if ms1 - ms0 < 2*blend:
+                    # too short to deal with
                     continue
-                if ms0 > start:
-                    if start < blend:
-                        clip = sample[start:ms0+blend]
-                        print("clip:", start, ms0+blend)
-                    else:
-                        clip = sample[start-blend:ms0+blend]
-                        print("clip:", start-blend, ms0+blend)
-                    if seg is None:
-                        seg = clip
-                    else:
-                        seg = seg.append(clip, crossfade=blend)
+                begin = sample[:ms0+blend]
                 print("silent:", ms0, ms1)
-                clip = AudioSegment.silent(duration=ms1-ms0)
-                if seg is None:
-                    seg = clip
-                else:
-                    seg = seg.append(clip, crossfade=blend)
-                start = ms1
-            # catch the last segment
-            if start < len(sample) - blend:
-                if start == 0:
-                    clip = sample[start:]
-                else:
-                    clip = sample[start-blend:]
-                if seg is None:
-                    seg = clip
-                else:
-                    seg = seg.append(clip, crossfade=blend)
-            #print("lengths:", len(sample), len(seg))
-            sample = seg
+                silent = AudioSegment.silent(duration=ms1-ms0)
+                end = sample[ms1-blend:]
+                new_sample = begin.append(silent, crossfade=blend)
+                new_sample = new_sample.append(end, crossfade=blend)
+            print("lengths:", len(sample), len(new_sample))
+            sample = new_sample
+            # renormalized in case we suppressed something crazy
+            sample = sample.normalize()
         sr = sample.frame_rate
         sync_ms = sync_offset
         if sync_ms >= 0:
