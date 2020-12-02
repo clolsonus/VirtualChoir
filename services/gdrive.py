@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from datetime import datetime
+from dateutil import parser
 import io
 import os
 import pickle
@@ -165,11 +166,15 @@ class gdrive():
             if item['trashed']:
                 continue
 
-            #print(item)
-            dt = datetime.strptime(item['createdTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            created = time.mktime(dt.timetuple())
-            dt = datetime.strptime(item['modifiedTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            modified = time.mktime(dt.timetuple())
+            print(item)
+            #dt = datetime.strptime(item['createdTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            # created = time.mktime(dt.timetuple())
+            dt = parser.isoparse(item['createdTime'])
+            created = dt.timestamp()
+            # dt = datetime.strptime(item['modifiedTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            #modified = time.mktime(dt.timetuple())
+            dt = parser.isoparse(item['modifiedTime'])
+            modified = dt.timestamp()
             print("  ts:", created, modified)                                   
 
             if item['mimeType'].endswith("folder"):
