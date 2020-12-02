@@ -37,9 +37,9 @@ class VideoGrid:
             cols = self.num_rows
             remainder = num_good_videos - self.num_rows*self.num_rows
         else:
-            self.num_rows = int(math.sqrt(num_good_videos / 3))
-            cols = self.num_rows * 3
-            remainder = num_good_videos - 3*self.num_rows*self.num_rows
+            self.num_rows = int(math.sqrt(num_good_videos / 2))
+            cols = self.num_rows * 2
+            remainder = num_good_videos - 2*self.num_rows*self.num_rows
         # setup basic row records
         self.rows = []
         for i in range(self.num_rows):
