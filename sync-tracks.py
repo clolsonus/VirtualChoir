@@ -117,6 +117,11 @@ if os.path.exists(hints_file):
             hint = row[1]
             if hint == "gain" or hint == "rotate" or hint == "video_shift":
                 hints[name][hint] = float(row[2])
+            elif hint == "suppress":
+                if "suppress" in hints[name]:
+                    hints[name]["suppress"].append( (float(row[2]), float(row[3])) )
+                else:
+                    hints[name]["suppress"] = [ (float(row[2]), float(row[3])) ]
             else:
                 log("unknwon hint in hint.txt:", row)
                 
