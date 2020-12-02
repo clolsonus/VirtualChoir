@@ -1,5 +1,5 @@
 import math
-import random
+from random import randrange
 
 from .logger import log
 
@@ -37,9 +37,9 @@ class VideoGrid:
             cols = self.num_rows
             remainder = num_good_videos - self.num_rows*self.num_rows
         else:
-            self.num_rows = int(math.sqrt(num_good_videos / 2))
-            cols = self.num_rows * 2
-            remainder = num_good_videos - 2*self.num_rows*self.num_rows
+            self.num_rows = int(math.sqrt(num_good_videos / 3))
+            cols = self.num_rows * 3
+            remainder = num_good_videos - 3*self.num_rows*self.num_rows
         # setup basic row records
         self.rows = []
         for i in range(self.num_rows):
@@ -120,7 +120,7 @@ class VideoGrid:
                     v.sort_order = self.place_count
                     if row > self.last_placed_row:
                         self.last_placed_row = row
-                        self.even_offset = self.output_w
+                        self.even_offset = self.output_w + randrange(int(cell_w))
                     if v.place_x is None:
                         if True or row % 2 == 0:
                             v.place_x = self.even_offset
