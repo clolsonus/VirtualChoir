@@ -121,7 +121,8 @@ def combine(names, samples, sync_offsets, mute_tracks,
         log("No unmuted audio tracks found.")
         return AudioSegment.silent(1000)
     print("total max:", np.max(y_mixed))
-    min_div = np.max(y_mixed) / 32767
+    print("total min:", np.min(y_mixed))
+    min_div = np.max(np.abs(y_mixed)) / 32766
     if math.sqrt(mixed_count) > min_div:
         # balsy but good chance of working
         y_mixed /= math.sqrt(mixed_count)
@@ -129,6 +130,7 @@ def combine(names, samples, sync_offsets, mute_tracks,
         y_mixed /= min_div
     #y_mixed /= math.pow(mixed_count, 0.6) # slightly more conservative
     #y_mixed / len(mixed_count) # very conservative output levels
+    print("mixed max:", np.max(np.abs(y_mixed)))
     y_mixed = np.int16(y_mixed)
     mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
     mixed.normalize()
