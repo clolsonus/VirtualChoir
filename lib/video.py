@@ -162,6 +162,8 @@ def render_combined_video(project, resolution, results_dir,
         #     # don't render but we still need a placeholder so videos
         #     # continue match offset time list by position
         #     videos.append(None)
+    if len(durations) == 0:
+        return
     duration = np.median(durations)
     duration += 4 # for credits/fade out
     log("median video duration (with fade to credits):", duration)
