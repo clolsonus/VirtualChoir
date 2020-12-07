@@ -150,7 +150,7 @@ class SampleGroup():
             times = self.time_list[i]
             env = []
             commands = []
-            print("track:", i, len(clarity))
+            print("track:", i, len(clarity), len(times))
             mean = np.mean(self.clarity_list[i])
             std = np.std(self.clarity_list[i])
             threshold = std * 0.07
@@ -191,12 +191,12 @@ class SampleGroup():
                 end = j
             print(" active:", active, start, end)
             if active:
-                env.append( [times[end], 1] )
+                env.append( [times[-1], 1] )
             else:
                 if (end - start)*dt >= 0.1:
                     p1 = start + int(round(0.1/dt))
                     env.append( [times[p1], 0] )
-                env.append( [times[end], 0] )
+                env.append( [times[-1], 0] )
             #print(env)
             self.envelope_list.append(env)
             print(commands)
