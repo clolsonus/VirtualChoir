@@ -182,6 +182,8 @@ class gdrive():
                 newurl = "https://drive.google.com/drive/folders/" + item['id']
                 newpath = os.path.join(work_dir, item['name'])
                 self.sync_folder(newurl, newpath)
+            elif item["mimeType"].endswith("shortcut"):
+                print("Shortcut encountered, don't know how to deal with this file:", item["name"])
             else:
                 # fetch file
                 print("%s (%s) %.0f Kb" % (item["name"], item["mimeType"], int(item["size"]) / 1024 ))
