@@ -87,7 +87,7 @@ class VideoGrid:
             self.odd_offset = 0
         if self.even_offset < self.output_w:
             self.even_offset = self.output_w
-        max_step = self.output_w * 0.010
+        max_step = self.output_w * 0.008
         if self.num_rows >= 2:
             animated_start = True
         else:
