@@ -154,9 +154,13 @@ def render_combined_video(project, resolution, results_dir,
     durations = []
     for i, file in enumerate(video_names):
         v = VideoTrack()
-        path = os.path.join(project, file)
-        if v.open(path):
-            durations.append(v.duration + offsets[i])
+        basename = os.path.basename(file)
+        if basename in hints and "video_hide" in hints[basename]:
+            log("not drawing video for:", file)
+        else:
+            path = os.path.join(project, file)
+            if v.open(path):
+                durations.append(v.duration + offsets[i])
         videos.append(v)
         # else:
         #     # don't render but we still need a placeholder so videos
