@@ -115,7 +115,7 @@ if os.path.exists(hints_file):
             if not name in hints:
                 hints[name] = {}
             hint = row[1]
-            if hint == "gain" or hint == "rotate" or hint == "video_shift":
+            if hint in [ "gain", "rotate", "video_shift", "video_hide" ]:
                 hints[name][hint] = float(row[2])
             elif hint == "suppress":
                 if "suppress" in hints[name]:
@@ -192,8 +192,8 @@ if not aup_project:
         if ref_index < 0:
             print("Unable to match reference track name, giving up.")
             quit()
-        #audio_group.correlate_to_reference(ref_index, audio_group.clarity_list, plot=True)
-        audio_group.correlate_to_reference(ref_index, audio_group.note_list, plot=True)
+        audio_group.correlate_to_reference(ref_index, audio_group.clarity_list, plot=True)
+        #audio_group.correlate_to_reference(ref_index, audio_group.note_list, plot=True)
     elif args.sync == "clarity":
         log("Sync by mutual best fit")
         audio_group.correlate_mutual(audio_group.clarity_list, plot=False)
