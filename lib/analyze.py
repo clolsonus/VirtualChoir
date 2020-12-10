@@ -38,11 +38,16 @@ class SampleGroup():
         max_frame_rate = 0
         self.sample_list = []
         for track in name_list:
+            #print("track:", track)
             basename, ext = os.path.splitext(track)
+            #print(basename, ext)
             path = os.path.join(project, track)
             if ext == ".aif":
                 ext = ".aiff"
-            sample = AudioSegment.from_file(path, ext[1:])
+            try:
+                sample = AudioSegment.from_file(path, ext[1:])
+            except:
+                sample = AudioSegment.silent(duration=10000)
             sample = sample.set_channels(2) # force samples to be stereo
             sample = sample.set_sample_width(2) # force to 2 for this project
             sample = sample.normalize()
