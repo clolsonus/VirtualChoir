@@ -7,7 +7,7 @@ audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "ogg", "wav" ]
 video_extensions = [ "avi", "mov", "mp4", "webm" ]
 audacity_extension = "aup"
 ignore_extensions = [ "lof", "txt", "zip" ]
-ignore_files = [ "gridded_video", "mixed_audio", "silent_video" ]
+ignore_files = [ "full-mix", "gridded_video", "mixed_audio", "silent_video" ]
 audio_tracks = []
 video_tracks = []
 aup_project = None
@@ -115,14 +115,18 @@ def is_newer(a, b):
         mtime_a = stat_a.st_mtime
         stat_b = os.stat(b)
         mtime_b = stat_b.st_mtime
-        if mtime_a >= mtime_b:
+        if mtime_a > mtime_b:
             return True
     return False
 
 # scan a directory for the things (does not recurse)
 def check_for_newer(path, ref_file):
+    if not os.path.exists(ref_file):
+        print("no ref file, need to process")
+        return True
     for file in sorted(os.listdir(path)):
         fullname = os.path.join(path, file)
         if is_newer(fullname, ref_file):
+            print(fullname, "is newer than", ref_file)
             return True
     return False

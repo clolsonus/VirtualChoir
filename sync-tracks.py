@@ -148,7 +148,11 @@ if not os.path.exists(results_dir):
 logger.init( os.path.join(results_dir, "report.txt") )
 
 for dir in work_dirs:
-    group_file = os.path.join(dir + "-mixed.mp3")
+    if dir == work_dirs[-1]:
+        # last dir (top level)
+        group_file = os.path.join(dir + "full-mix.mp3")
+    else:
+        group_file = os.path.join(dir + "-mixed.mp3")
     if not scan.check_for_newer(dir, group_file):
         # nothing changed, so skip processing
         continue
@@ -209,7 +213,8 @@ for dir in work_dirs:
         # we found an audacity project, let's read the sync offsets from that
         log("Found an audacity project file, using that for time syncs:",
             audio_group.aup_file, fancy=True)
-        sync_offsets = aup.offsets_from_aup(audio_tracks, audio_group.sample_list,
+        sync_offsets = aup.offsets_from_aup(audio_group.name_list,
+                                            audio_group.sample_list,
                                             dir, audio_group.aup_file)
 
     log("Mixing samples...", fancy=True)
