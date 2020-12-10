@@ -10,12 +10,13 @@ from pydub import AudioSegment, scipy_effects # pip install pydub
 from tqdm import tqdm
 
 from .logger import log
+from . import scan
 
 hop_length = 512
 
 class SampleGroup():
-    def __init__(self):
-        self.project = None
+    def __init__(self, path):
+        self.path = path
         self.name_list = []
         self.sample_list = []
         self.raw_list = []
@@ -30,18 +31,20 @@ class SampleGroup():
         self.suppress_list = None
         self.leadin_list = []
         self.fadeout_list = []
+        self.aup_file = None
 
-    def load(self, project, name_list):
-        log("loading audio tracks...")
-        self.project = project
-        self.name_list = name_list
+    def load(self):
+        audio_tracks, video_tracks, aup_file = scan.scan_directory(self.path)
+        log("loading audio tracks:", audio_tracks)
+        self.name_list = audio_tracks
+        self.aup_file = aup_file
         max_frame_rate = 0
         self.sample_list = []
-        for track in name_list:
+        for track in self.name_list:
             #print("track:", track)
             basename, ext = os.path.splitext(track)
             #print(basename, ext)
-            path = os.path.join(project, track)
+            path = os.path.join(self.path, track)
             if ext == ".aif":
                 ext = ".aiff"
             try:
@@ -105,15 +108,21 @@ class SampleGroup():
         return False
 
     def compute_clarities(self):
-        print("Computing clarities...")
+        # make cache directory (if it doesn't exist)
+        cache_dir = os.path.join(self.path, "cache")
+        if not os.path.exists(cache_dir):
+            log("Creating:", cache_dir)
+            os.makedirs(cache_dir)
+
+        log("Computing clarities...")
         self.clarity_list = []
         self.chroma_list = []
         for i, raw in enumerate(tqdm(self.raw_list)):
             # check cache
-            fullname = os.path.join(self.project, self.name_list[i])
+            fullname = os.path.join(self.path, self.name_list[i])
             name = os.path.basename(self.name_list[i])
             basename, ext = os.path.splitext(name)
-            cachename = os.path.join(self.project, "cache",
+            cachename = os.path.join(self.path, "cache",
                                      basename + ".clarity")
             if self.is_newer(cachename, fullname):
                 # load from cache

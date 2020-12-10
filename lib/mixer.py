@@ -6,11 +6,11 @@ import random
 
 from .logger import log
 
-def combine(names, samples, sync_offsets, mute_tracks,
+def combine(group, sync_offsets, mute_tracks,
             hints={}, pan_range=0, suppress_list=None):
     durations_ms = []
-    for i, sample in enumerate(samples):
-        # print(names[i], len(sample) / 1000, sync_offsets[i])
+    for i, sample in enumerate(group.sample_list):
+        # print(group.name_list[i], len(sample) / 1000, sync_offsets[i])
         durations_ms.append( len(sample) - sync_offsets[i] )
     duration_ms = np.median(durations_ms)
     log("median audio duration (sec):", duration_ms / 1000)
@@ -19,7 +19,7 @@ def combine(names, samples, sync_offsets, mute_tracks,
         log("NOTICE: performing noise surpression on individual tracks.")
         
     # auto mute reference tracks, but include accompaniment
-    for name in names:
+    for name in group.name_list:
         print("checking:", name)
         if name in mute_tracks:
             # already muted
@@ -32,14 +32,14 @@ def combine(names, samples, sync_offsets, mute_tracks,
                 
     y_mixed = None
     mixed_count = 0
-    for i, sample in enumerate(samples):
-        if names[i] in mute_tracks:
-            log("skipping muted:", names[i])
+    for i, sample in enumerate(group.sample_list):
+        if group.name_list[i] in mute_tracks:
+            log("skipping muted:", group.name_list[i])
             continue
         if sample is None:
             log("empty sample")
             continue
-        basename = os.path.basename(names[i])
+        basename = os.path.basename(group.name_list[i])
         if basename in hints and "gain" in hints[basename]:
             track_gain = hints[basename]["gain"]
         else:
@@ -49,7 +49,7 @@ def combine(names, samples, sync_offsets, mute_tracks,
             sync_offset = 0
         else:
             sync_offset = sync_offsets[i]
-        log(" ", names[i], "offset(sec):", sync_offset/1000,
+        log(" ", group.name_list[i], "offset(sec):", sync_offset/1000,
             "gain:", track_gain)
         sample = sample.set_channels(2)
         if pan_range > 0.00001 and pan_range <= 1.0:
@@ -99,7 +99,7 @@ def combine(names, samples, sync_offsets, mute_tracks,
         # trim end for length
         synced_sample = synced_sample[:duration_ms]
         synced_sample = synced_sample.fade_out(1000)
-        samples[i] = synced_sample
+        group.sample_list[i] = synced_sample
         
         y = np.array(synced_sample.get_array_of_samples()).astype('double')
         print(i, "max:", np.max(y))

@@ -15,6 +15,7 @@ from lib import aup
 from lib import logger
 from lib.logger import log
 from lib import mixer
+from lib import scan
 from lib import video
 
 parser = argparse.ArgumentParser(description='virtual choir')
@@ -40,13 +41,9 @@ ignore_extensions = [ "au", "lof", "txt", "zip" ]
 ignore_files = [ "gridded_video", "mixed_audio", "silent_video" ]
 audio_tracks = []
 video_tracks = []
-title_page = None
-credits_page = None
 aup_project = None
 
 def scan_directory(path, pretty_path=""):
-    global title_page
-    global credits_page
     global aup_project
     for file in sorted(os.listdir(path)):
         fullname = os.path.join(path, file)
@@ -76,20 +73,21 @@ def scan_directory(path, pretty_path=""):
                         print("Using first one found:", aup_project)
                     else:
                         print("WARNING! Ignoring .aup file found in subdirectory:", aup_project)
-            elif basename.lower() == "title":
-                title_page = pretty_name
-            elif basename.lower() == "credits":
-                credits_page = pretty_name
             else:
                 print("Unknown extenstion (skipping):", file)
 
 log("Begin processing job", fancy=True)
 log("Command line arguments:", args)
 
+work_dirs = scan.work_directories(args.project)
+print("work dirs:", work_dirs)
+
 scan_directory(args.project)
 
+title_page = scan.find_basename(args.project, "title")
 if title_page:
     log("title page:", title_page)
+credits_page = scan.find_basename(args.project, "credits")
 if credits_page:
     log("credits page:", credits_page)
 log("audio tracks:", audio_tracks)
@@ -146,93 +144,92 @@ if not os.path.exists(results_dir):
     print("Creating:", results_dir)
     os.makedirs(results_dir)
 
-# make cache directory (if it doesn't exist)
-cache_dir = os.path.join(args.project, "cache")
-if not os.path.exists(cache_dir):
-    print("Creating:", cache_dir)
-    os.makedirs(cache_dir)
-
 # initialize logger
 logger.init( os.path.join(results_dir, "report.txt") )
 
-# load audio tracks, normalize, and resample at common (highest) sample rate
-audio_group = analyze.SampleGroup()
-audio_group.load(args.project, audio_tracks)
-
-if args.suppress_noise or not aup_project:
-    # we need to do a full analysis if we are asked to suppress noise
-    # or we need to compute sync
+for dir in work_dirs:
+    group_file = os.path.join(dir + "-mixed.mp3")
+    if not scan.check_for_newer(dir, group_file):
+        # nothing changed, so skip processing
+        continue
     
-    # generate mono version, set consistent sample rate, and filer for
-    # analysis step
-    log("Generating raw signals...")
-    audio_group.compute_raw()
+    # load audio tracks, normalize, and resample at common (highest) sample rate
+    audio_group = analyze.SampleGroup(dir)
+    audio_group.load()
 
-    # analyze audio streams (using librosa functions)
-    log("Analyzing audio tracks...")
-    audio_group.compute_onset()
-    audio_group.compute_intensities()
-    audio_group.compute_clarities()
-    if args.suppress_noise:
-        audio_group.compute_envelopes()
-    # audio_group.gen_plots(audio_tracks, sync_offsets=None)
-    
-sync_offsets = []
-if not aup_project:
-    # let's figure out the autosync, fingers crossed!!!
-    log("Starting automatic track alignment process...", fancy=True)
-    
-    log("Correlating audio samples")
-    if args.reference:
-        ref_index = -1
-        for i, name in enumerate(audio_tracks):
-            if name.endswith(args.reference):
-                ref_index = i
-                print("found reference track, index:", i)
-        if ref_index < 0:
-            print("Unable to match reference track name, giving up.")
-            quit()
-        audio_group.correlate_to_reference(ref_index, audio_group.clarity_list, plot=True)
-        #audio_group.correlate_to_reference(ref_index, audio_group.note_list, plot=True)
-    elif args.sync == "clarity":
-        log("Sync by mutual best fit")
-        audio_group.correlate_mutual(audio_group.clarity_list, plot=False)
-    elif args.sync == "clap":
-        log("Sync by lead in claps")
-        audio_group.sync_by_claps(plot=False)
+    if args.suppress_noise or not audio_group.aup_file:
+        # we need to do a full analysis if we are asked to suppress noise
+        # or we need to compute sync
 
-    log("Generating audacity_import.lof file")
-    with open(os.path.join(results_dir, "audacity_import.lof"), 'w') as fp:
+        # generate mono version, set consistent sample rate, and filer for
+        # analysis step
+        log("Generating raw signals...")
+        audio_group.compute_raw()
+
+        # analyze audio streams (using librosa functions)
+        log("Analyzing audio tracks...")
+        audio_group.compute_onset()
+        audio_group.compute_intensities()
+        audio_group.compute_clarities()
+        if args.suppress_noise:
+            audio_group.compute_envelopes()
+        # audio_group.gen_plots(audio_tracks, sync_offsets=None)
+
+    sync_offsets = []
+    if not audio_group.aup_file:
+        # let's figure out the autosync, fingers crossed!!!
+        log("Starting automatic track alignment process...", fancy=True)
+
+        log("Correlating audio samples")
+        if args.reference:
+            ref_index = -1
+            for i, name in enumerate(audio_tracks):
+                if name.endswith(args.reference):
+                    ref_index = i
+                    print("found reference track, index:", i)
+            if ref_index < 0:
+                print("Unable to match reference track name, giving up.")
+                quit()
+            audio_group.correlate_to_reference(ref_index, audio_group.clarity_list, plot=True)
+            #audio_group.correlate_to_reference(ref_index, audio_group.note_list, plot=True)
+        elif args.sync == "clarity":
+            log("Sync by mutual best fit")
+            audio_group.correlate_mutual(audio_group.clarity_list, plot=False)
+        elif args.sync == "clap":
+            log("Sync by lead in claps")
+            audio_group.sync_by_claps(plot=False)
+
+        log("Generating audacity_import.lof file")
+        with open(os.path.join(dir, "audacity_import.lof"), 'w') as fp:
+            for i in range(len(audio_group.offset_list)):
+                fp.write('file "%s" offset %.3f\n' % (audio_group.name_list[i], audio_group.offset_list[i]))
         for i in range(len(audio_group.offset_list)):
-            fp.write('file "%s" offset %.3f\n' % (audio_tracks[i], audio_group.offset_list[i]))
-    for i in range(len(audio_group.offset_list)):
-        sync_offsets.append( -audio_group.offset_list[i] * 1000) # ms units
-else:
-    # we found an audacity project, let's read the sync offsets from that
-    log("Found an audacity project file, using that for time syncs:",
-        aup_project, fancy=True)
-    sync_offsets = aup.offsets_from_aup(audio_tracks, audio_group.sample_list,
-                                        args.project, aup_project)
+            sync_offsets.append( -audio_group.offset_list[i] * 1000) # ms units
+    else:
+        # we found an audacity project, let's read the sync offsets from that
+        log("Found an audacity project file, using that for time syncs:",
+            audio_group.aup_file, fancy=True)
+        sync_offsets = aup.offsets_from_aup(audio_tracks, audio_group.sample_list,
+                                            dir, audio_group.aup_file)
 
-log("Mixing samples...", fancy=True)
+    log("Mixing samples...", fancy=True)
 
-if args.mute_videos:
-    log("Reqeust to mute the audio channels on videos: lip sync mode.")
-    mute_tracks = video_tracks
-else:
-    mute_tracks = []
-mixed = mixer.combine(audio_tracks, audio_group.sample_list, sync_offsets,
-                      mute_tracks, hints=hints, pan_range=0.3,
-                      suppress_list=audio_group.suppress_list)
-group_file = os.path.join(results_dir, "mixed_audio.mp3")
-log("Mixed audio file: mixed_audio.mp3")
-mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
+    if args.mute_videos:
+        log("Reqeust to mute the audio channels on videos: lip sync mode.")
+        mute_tracks = video_tracks
+    else:
+        mute_tracks = []
+    mixed = mixer.combine(audio_group, sync_offsets,
+                          mute_tracks, hints=hints, pan_range=0.3,
+                          suppress_list=audio_group.suppress_list)
+    log("Mixed audio file:", group_file)
+    mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 
-if args.write_aligned_tracks:
-    log("Generating trimmed/padded tracks that start at a common aligned time.")
-    # write trimmed/padded samples for 'easy' alignment
-    mixer.save_aligned(results_dir, audio_tracks, audio_group.sample_list,
-                       mute_tracks)
+    if args.write_aligned_tracks:
+        log("Generating trimmed/padded tracks that start at a common aligned time.")
+        # write trimmed/padded samples for 'easy' alignment
+        mixer.save_aligned(results_dir, audio_tracks, audio_group.sample_list,
+                           mute_tracks)
 
 if len(video_tracks) and not args.no_video:
     log("Generating gridded video", fancy=True)
