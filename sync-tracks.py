@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import csv
 import librosa                  # pip install librosa
 import librosa.display
 import matplotlib.pyplot as plt
@@ -12,6 +11,7 @@ from tqdm import tqdm
 
 from lib import analyze
 from lib import aup
+from lib import hints
 from lib import logger
 from lib.logger import log
 from lib import mixer
@@ -33,56 +33,13 @@ parser.add_argument('--write-aligned-tracks', action='store_true', help='write o
 
 args = parser.parse_args()
 
-# find all the project clips (todo: recurse)
-audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "ogg", "wav" ]
-video_extensions = [ "avi", "mov", "mp4", "webm" ]
-audacity_extension = "aup"
-ignore_extensions = [ "au", "lof", "txt", "zip" ]
-ignore_files = [ "gridded_video", "mixed_audio", "silent_video" ]
-audio_tracks = []
-video_tracks = []
-aup_project = None
-
-def scan_directory(path, pretty_path=""):
-    global aup_project
-    for file in sorted(os.listdir(path)):
-        fullname = os.path.join(path, file)
-        pretty_name = os.path.join(pretty_path, file)
-        # print(pretty_name)
-        if os.path.isdir(fullname):
-            if file == "cache" or file == "results":
-                pass
-            else:
-                scan_directory(fullname, os.path.join(pretty_path, file))
-        else:
-            basename, ext = os.path.splitext(file)
-            if basename in ignore_files:
-                continue
-            if not len(ext) or ext[1:].lower() in ignore_extensions:
-                continue
-            if ext[1:].lower() in audio_extensions + video_extensions:
-                audio_tracks.append(pretty_name)
-                if ext[1:].lower() in video_extensions:
-                    video_tracks.append(pretty_name)
-            elif ext[1:].lower() == audacity_extension:
-                if aup_project == None and not pretty_path:
-                    aup_project = pretty_name
-                else:
-                    if aup_project != None:
-                        print("WARNING! More than one audacity project file (.aup) found")
-                        print("Using first one found:", aup_project)
-                    else:
-                        print("WARNING! Ignoring .aup file found in subdirectory:", aup_project)
-            else:
-                print("Unknown extenstion (skipping):", file)
-
 log("Begin processing job", fancy=True)
 log("Command line arguments:", args)
 
-work_dirs = scan.work_directories(args.project)
+work_dirs = scan.work_directories(args.project, order="bottom_up")
 print("work dirs:", work_dirs)
 
-scan_directory(args.project)
+all_audio_tracks, all_video_tracks = scan.recurse_directory(args.project)
 
 title_page = scan.find_basename(args.project, "title")
 if title_page:
@@ -90,54 +47,18 @@ if title_page:
 credits_page = scan.find_basename(args.project, "credits")
 if credits_page:
     log("credits page:", credits_page)
-log("audio tracks:", audio_tracks)
-log("video tracks:", video_tracks)
+log("audio tracks:", all_audio_tracks)
+log("video tracks:", all_video_tracks)
 
-if aup_project:
-    print("audacity project for sync:", aup_project)
+#if aup_project:
+#    print("audacity project for sync:", aup_project)
 
-hints_file = os.path.join(args.project, "hints.txt")
-hints = {}
-#gain_hints = {}
-#rotate_hints = {}
-if os.path.exists(hints_file):
-    log("Found a hints.txt file, loading...")
-    with open(hints_file, 'r') as fp:
-        reader = csv.reader(fp, delimiter=' ', skipinitialspace=True)
-        for row in reader:
-            print("|".join(row))
-            if len(row) < 3:
-                log("bad hint.txt syntax:", row)
-                continue
-            name = row[0]
-            if not name in hints:
-                hints[name] = {}
-            hint = row[1]
-            if hint in [ "gain", "rotate", "video_shift", "video_hide" ]:
-                hints[name][hint] = float(row[2])
-            elif hint == "suppress":
-                if "suppress" in hints[name]:
-                    hints[name]["suppress"].append( (float(row[2]), float(row[3])) )
-                else:
-                    hints[name]["suppress"] = [ (float(row[2]), float(row[3])) ]
-            else:
-                log("unknwon hint in hint.txt:", row)
-                
-            # if hint == "gain":
-            #     if len(row) == 3:
-            #         gain_hints[name] = float(row[2])
-            #     else:
-            #         print("bad hint.txt syntax:", row)
-            # elif hint == "rotate":
-            #     if len(row) == 3:
-            #         rotate_hints[name] = int(row[2])
-            #     else:
-            #         print("bad hint.txt syntax:", row)
-            # else:
-            #     print("hint unknown (or typo):", row)
-else:
-    log("no hints file found.")
-    
+# load and accumulate hints for all dirs
+hint_dict = {}
+for dir in work_dirs:
+    hint_dict.update( hints.load(dir) )
+log("hints:", hint_dict)
+
 # make results directory (if it doesn't exist)
 results_dir = os.path.join(args.project, "results")
 if not os.path.exists(results_dir):
@@ -187,7 +108,7 @@ for dir in work_dirs:
         log("Correlating audio samples")
         if args.reference:
             ref_index = -1
-            for i, name in enumerate(audio_tracks):
+            for i, name in enumerate(audio_group.name_list):
                 if name.endswith(args.reference):
                     ref_index = i
                     print("found reference track, index:", i)
@@ -221,11 +142,11 @@ for dir in work_dirs:
 
     if args.mute_videos:
         log("Reqeust to mute the audio channels on videos: lip sync mode.")
-        mute_tracks = video_tracks
+        mute_tracks = all_video_tracks
     else:
         mute_tracks = []
     mixed = mixer.combine(audio_group, sync_offsets,
-                          mute_tracks, hints=hints, pan_range=0.3,
+                          mute_tracks, hints=hint_dict, pan_range=0.3,
                           suppress_list=audio_group.suppress_list)
     log("Mixed audio file:", group_file)
     mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
@@ -233,26 +154,32 @@ for dir in work_dirs:
     if args.write_aligned_tracks:
         log("Generating trimmed/padded tracks that start at a common aligned time.")
         # write trimmed/padded samples for 'easy' alignment
-        mixer.save_aligned(results_dir, audio_tracks, audio_group.sample_list,
-                           mute_tracks)
+        mixer.save_aligned(results_dir, audio_group.name_list,
+                           audio_group.sample_list, mute_tracks)
 
-if len(video_tracks) and not args.no_video:
+if len(all_video_tracks) and not args.no_video:
+    offsets = aup.build_offset_map(args.project)
+    
     log("Generating gridded video", fancy=True)
     video_offsets = []
-    for track in video_tracks:
-        ai = audio_tracks.index(track)
-        print(track, ai, -sync_offsets[ai] / 1000)
-        video_offsets.append( -sync_offsets[ai] / 1000 )
+    for track in all_video_tracks:
+        if track in offsets:
+            offset = offsets[track]["offset"]
+        else:
+            log("No offset found for:", track)
+        print(track, offset)
+        video_offsets.append(offset)
     # render the new combined video
     video.render_combined_video( args.project, args.resolution, results_dir,
-                                 video_tracks, video_offsets,
-                                 hints=hints,
+                                 all_video_tracks, video_offsets,
+                                 hints=hint_dict,
                                  title_page=title_page,
                                  credits_page=credits_page )
-    video.merge( results_dir )
+    video.merge( args.project, results_dir )
     if args.write_aligned_tracks:
         log("Generating trimmed/padded tracks that start at a common aligned time.")
-        video.save_aligned(args.project, results_dir, video_tracks, sync_offsets)
+        video.save_aligned(args.project, results_dir, all_video_tracks,
+                           sync_offsets)
     
 else:
     log("No video tracks, or audio-only requested.")

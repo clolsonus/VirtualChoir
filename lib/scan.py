@@ -6,14 +6,13 @@ from .logger import log
 audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "ogg", "wav" ]
 video_extensions = [ "avi", "mov", "mp4", "webm" ]
 audacity_extension = "aup"
-ignore_extensions = [ "lof", "txt", "zip" ]
+ignore_extensions = [ "au", "lof", "txt", "zip" ]
 ignore_files = [ "full-mix", "gridded_video", "mixed_audio", "silent_video" ]
-audio_tracks = []
-video_tracks = []
-aup_project = None
 
+# scan a directory for the things (does recurse)
 def recurse_directory(path, pretty_path=""):
-    global aup_project
+    audio_tracks = []
+    video_tracks = []
     for file in sorted(os.listdir(path)):
         fullname = os.path.join(path, file)
         pretty_name = os.path.join(pretty_path, file)
@@ -22,7 +21,9 @@ def recurse_directory(path, pretty_path=""):
             if file == "cache" or file == "results":
                 pass
             else:
-                scan_directory(fullname, os.path.join(pretty_path, file))
+                a, v = recurse_directory(fullname, pretty_name)
+                audio_tracks += a
+                video_tracks += v
         else:
             basename, ext = os.path.splitext(file)
             if basename in ignore_files:
@@ -34,26 +35,19 @@ def recurse_directory(path, pretty_path=""):
                 if ext[1:].lower() in video_extensions:
                     video_tracks.append(pretty_name)
             elif ext[1:].lower() == audacity_extension:
-                if aup_project == None and not pretty_path:
-                    aup_project = pretty_name
-                else:
-                    if aup_project != None:
-                        print("WARNING! More than one audacity project file (.aup) found")
-                        print("Using first one found:", aup_project)
-                    else:
-                        print("WARNING! Ignoring .aup file found in subdirectory:", aup_project)
+                # audacity project file
+                pass
             else:
                 print("Unknown extenstion (skipping):", file)
+    return audio_tracks, video_tracks
 
 # scan a directory for the things (does not recurse)
-def scan_directory(path, pretty_path=""):
+def scan_directory(path):
     audio_tracks = []
     video_tracks = []
     aup_project = None
     for file in sorted(os.listdir(path)):
         fullname = os.path.join(path, file)
-        pretty_name = os.path.join(pretty_path, file)
-        # print(pretty_name)
         if os.path.isdir(fullname):
             # skip subdirectories
             pass
@@ -64,25 +58,23 @@ def scan_directory(path, pretty_path=""):
             if not len(ext) or ext[1:].lower() in ignore_extensions:
                 continue
             if ext[1:].lower() in audio_extensions + video_extensions:
-                audio_tracks.append(pretty_name)
+                audio_tracks.append(file)
                 if ext[1:].lower() in video_extensions:
-                    video_tracks.append(pretty_name)
+                    video_tracks.append(file)
             elif ext[1:].lower() == audacity_extension:
-                if aup_project == None and not pretty_path:
-                    aup_project = pretty_name
-                else:
-                    if aup_project != None:
-                        print("WARNING! More than one audacity project file (.aup) found")
-                        print("Using first one found:", aup_project)
-                    else:
-                        print("WARNING! Ignoring .aup file found in subdirectory:", aup_project)
+                if aup_project == None:
+                    aup_project = file
             else:
                 print("Unknown extenstion (skipping):", file)
     return audio_tracks, video_tracks, aup_project
 
 # scan for nested work directories
-def work_directories(path, pretty_path=""):
+def work_directories(path, order="bottom_up", pretty_path=""):
     dirs = []
+    if path.endswith("/"):
+        path = path[:-1]
+    if order == "top_down":
+        dirs.append(path)
     for file in sorted(os.listdir(path)):
         fullname = os.path.join(path, file)
         pretty_name = os.path.join(pretty_path, file)
@@ -94,8 +86,9 @@ def work_directories(path, pretty_path=""):
                 # assume this is an audacity project dir
                 log("Skipping audacity project dir:", pretty_name)
             else:
-                dirs += work_directories(fullname, pretty_name)
-    dirs.append( path )
+                dirs += work_directories(fullname, order, pretty_name)
+    if order == "bottom_up":
+        dirs.append( path )
     return dirs
 
 # search path (does not recurse) for file with matching basename (case
@@ -104,6 +97,16 @@ def find_basename(path, search):
     for file in sorted(os.listdir(path)):
         basename, ext = os.path.splitext(file)
         if basename.lower() == search:
+            # return pretty name for convenience
+            return os.path.join(path, file)
+    return None
+
+# search path (does not recurse) for file with matching basename (case
+# insensitive)
+def find_extension(path, search):
+    for file in sorted(os.listdir(path)):
+        basename, ext = os.path.splitext(file)
+        if ext[1:].lower() == search:
             # return pretty name for convenience
             return os.path.join(path, file)
     return None

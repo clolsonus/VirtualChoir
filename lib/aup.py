@@ -1,7 +1,9 @@
+import csv
 import lxml.etree as ET
 import os
 
 from .logger import log
+from . import scan
 
 # keep in mind:
 
@@ -66,3 +68,75 @@ def offsets_from_aup(audio_tracks, audio_samples, dir, file):
             sync_offsets[i] = 0.0
     print(sync_offsets)
     return sync_offsets
+
+def parse_aup(aup_file, dir_offset, pretty_path):
+    offsets = {}
+    xml = ET.parse(aup_file)
+    project = xml.getroot()
+    print(project.tag)
+    for wt in project.iter('{*}wavetrack'):
+        #localname = ET.QName(wt.tag).localname
+        #print(localname)
+        basename = wt.attrib["name"]
+        rate = float(wt.attrib["rate"])
+        wc = wt.find('{*}waveclip')
+        offset = float(wc.attrib["offset"])
+        seq = wc.find('{*}sequence')
+        numsamp = int(seq.attrib["numsamples"])
+        length = numsamp / rate
+        print(basename, offset+dir_offset, length)
+        offsets[os.path.join(pretty_path, basename)] = {
+            "offset": offset+dir_offset,
+            "length": length
+        }
+    print("offsets:", offsets)
+    return(offsets)
+    
+def parse_lof(lof_file, dir_offset, pretty_path):
+    if not os.path.exists(lof_file):
+        log("Cannot find a .lof timing file, aborting:", lof_file)
+        quit()
+    offsets = {}
+    with open(lof_file, 'r') as fp:
+        reader = csv.reader(fp, delimiter=' ', skipinitialspace=True)
+        for row in reader:
+            print("|".join(row))
+            if len(row) != 4:
+                log("bad lof file syntax:", row)
+                continue
+            name = row[1]
+            offsets[os.path.join(pretty_path, name)] = {
+                "offset": float(row[3])+dir_offset,
+                "length": None
+            }
+    print("offsets:", offsets)
+    return(offsets)
+
+def build_offset_map(path):
+    offsets = {}
+    dirs = scan.work_directories(path, order="top_down")
+    remove = len(dirs[0])            # hacky
+    for dir in dirs: 
+        pretty_path = dir[(remove+1):]
+        print("remove:", dir, pretty_path)
+        basename = os.path.basename(dir)
+        mixed_name = basename + "-mixed"
+        print("mixed_name:", mixed_name)
+        if mixed_name in offsets:
+            dir_offset = offsets[mixed_name]["offset"]
+        else:
+            dir_offset = 0.0
+        print(dir, basename, dir_offset)
+        audio_tracks, video_tracks, aup_file = scan.scan_directory(dir)
+        aup_file = scan.find_extension(dir, "aup")
+        if aup_file:
+            print(" ", aup_file)
+            result = parse_aup(aup_file, dir_offset, pretty_path)
+            offsets.update( result )
+        else:
+            # better find a .lof file
+            result = parse_lof( os.path.join(dir, "audacity_import.lof"),
+                                dir_offset, pretty_path )
+            offsets.update( result )
+    print("OFFSETS:", offsets)
+    return offsets
