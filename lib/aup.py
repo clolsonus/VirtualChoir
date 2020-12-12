@@ -124,6 +124,8 @@ def build_offset_map(path):
         print("mixed_name:", mixed_name)
         if mixed_name in offsets:
             dir_offset = offsets[mixed_name]["offset"]
+        elif mixed_name + ".mp3" in offsets:
+            dir_offset = offsets[mixed_name + ".mp3"]["offset"]
         else:
             dir_offset = 0.0
         print(dir, basename, dir_offset)
