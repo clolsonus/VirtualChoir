@@ -120,7 +120,7 @@ def build_offset_map(path):
         pretty_path = dir[(remove+1):]
         print("remove:", dir, pretty_path)
         basename = os.path.basename(dir)
-        mixed_name = basename + "-mixed"
+        mixed_name = basename + "-mix"
         print("mixed_name:", mixed_name)
         if mixed_name in offsets:
             dir_offset = offsets[mixed_name]["offset"]
