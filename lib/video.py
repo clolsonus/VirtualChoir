@@ -324,7 +324,7 @@ def merge(project, results_dir):
     log("video: merging video and audio into final result: gridded_video.mp4")
     # use ffmpeg to combine the video and audio tracks into the final movie
     input_video = os.path.join(results_dir, "silent_video.mp4")
-    input_audio = os.path.join(project, "full-mix.mp3")
+    input_audio = os.path.join(results_dir, "full-mix.mp3")
     output_video = os.path.join(results_dir, "gridded_video.mp4")
     result = call(["ffmpeg", "-i", input_video, "-i", input_audio, "-c:v", "copy", "-c:a", "aac", "-y", output_video])
     print("ffmpeg result code:", result)
