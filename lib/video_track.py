@@ -1,5 +1,7 @@
 import cv2
+import json
 import numpy as np
+import os
 import skvideo.io               # pip install sk-video
 
 from .logger import log
@@ -29,13 +31,19 @@ class VideoTrack:
         fps_string = metadata['video']['@r_frame_rate']
         (num, den) = fps_string.split('/')
         self.fps = float(num) / float(den)
-        if self.fps < 1 or self.fps > 120:
+        # sanity check fps
+        use_backup_fps = False
+        name, ext = os.path.splitext(file)
+        if ext[1:] == "webm" and (self.fps < 1 or self.fps > 1000):
+            use_backup_fps = True
+        elif self.fps < 1 or self.fps > 120:
+            use_backup_fps = True
+        if use_backup_fps:
             # something crazy happened let's try something else
             fps_string = metadata['video']['@avg_frame_rate']
             (num, den) = fps_string.split('/')
-            self.fps = float(num) / float(den)
-
-        self.fps = float(num) / float(den)
+            if float(den) > 0:
+                self.fps = float(num) / float(den)
         codec = metadata['video']['@codec_long_name']
         self.w = int(metadata['video']['@width'])
         self.h = int(metadata['video']['@height'])
