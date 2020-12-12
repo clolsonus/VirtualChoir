@@ -71,9 +71,10 @@ logger.init( os.path.join(results_dir, "report.txt") )
 for dir in work_dirs:
     if dir == work_dirs[-1]:
         # last dir (top level)
-        group_file = os.path.join(dir + "full-mix.mp3")
+        group_file = os.path.join(dir, "full-mix.mp3")
     else:
         group_file = os.path.join(dir + "-mixed.mp3")
+    print("group_file:", group_file)
     if not scan.check_for_newer(dir, group_file):
         # nothing changed, so skip processing
         continue
@@ -82,6 +83,7 @@ for dir in work_dirs:
     audio_group = analyze.SampleGroup(dir)
     audio_group.load()
 
+    print("aup:", audio_group.aup_file)
     if args.suppress_noise or not audio_group.aup_file:
         # we need to do a full analysis if we are asked to suppress noise
         # or we need to compute sync
