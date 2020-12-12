@@ -71,10 +71,10 @@ logger.init( os.path.join(results_dir, "report.txt") )
 for dir in work_dirs:
     if dir == work_dirs[-1]:
         # last dir (top level)
-        group_file = os.path.join(dir, "full-mix.mp3")
+        group_file = os.path.join(results_dir, "full-mix.mp3")
     else:
-        group_file = os.path.join(dir + "-mixed.mp3")
-    print("group_file:", group_file)
+        group_file = os.path.join(dir + "-mix.mp3")
+    #print("group_file:", group_file)
     if not scan.check_for_newer(dir, group_file):
         # nothing changed, so skip processing
         continue
@@ -165,8 +165,13 @@ if len(all_video_tracks) and not args.no_video:
     log("Generating gridded video", fancy=True)
     video_offsets = []
     for track in all_video_tracks:
+        trackbase, ext = os.path.splitext(track)
         if track in offsets:
+            # from .lof file
             offset = offsets[track]["offset"]
+        elif trackbase in offsets:
+            # aup doesn't save ext
+            offset = offsets[trackbase]["offset"]
         else:
             log("No offset found for:", track)
         print(track, offset)
