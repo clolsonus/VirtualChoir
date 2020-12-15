@@ -70,6 +70,7 @@ def combine(group, sync_offsets, mute_tracks,
             blend = 300         # ms
             seg = None
             start = 0
+            nwe_sample = None
             for cmd in commands:
                 print("command:", cmd)
                 (t0, t1) = cmd
@@ -85,10 +86,12 @@ def combine(group, sync_offsets, mute_tracks,
                 end = sample[ms1-blend:]
                 new_sample = begin.append(silent, crossfade=blend)
                 new_sample = new_sample.append(end, crossfade=blend)
-            print("lengths:", len(sample), len(new_sample))
-            sample = new_sample
-            # renormalized in case we suppressed something crazy
-            sample = sample.normalize()
+            if not new_sample is None:
+                # we processed some commands
+                print("lengths:", len(sample), len(new_sample))
+                sample = new_sample
+                # renormalized in case we suppressed something crazy
+                sample = sample.normalize()
         sr = sample.frame_rate
         sync_ms = sync_offset
         if sync_ms >= 0:
