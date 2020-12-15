@@ -9,6 +9,7 @@ from subprocess import call
 from tqdm import tqdm
 
 from .logger import log
+from . import video_crop
 from .video_track import VideoTrack
 from .video_grid import VideoGrid
 from .video_spiral import VideoSpiral
@@ -37,50 +38,6 @@ def gen_dicts(fps, quality="sane"):
         }
     return inputdict, outputdict
 
-# return a scaled versino of the frame that fits
-def get_fit(frame, scale_w, scale_h):
-    if scale_w < scale_h:
-        result = cv2.resize(frame, (0,0), fx=scale_w, fy=scale_w,
-                            interpolation=cv2.INTER_AREA)
-    else:
-        result = cv2.resize(frame, (0,0), fx=scale_h, fy=scale_h,
-                            interpolation=cv2.INTER_AREA)
-    return result
-
-def get_zoom(frame, scale_w, scale_h):
-    if scale_w < scale_h:
-        result = cv2.resize(frame, (0,0), fx=scale_h, fy=scale_h,
-                            interpolation=cv2.INTER_AREA)
-    else:
-        result = cv2.resize(frame, (0,0), fx=scale_w, fy=scale_w,
-                            interpolation=cv2.INTER_AREA)
-    return result
-        
-def clip_frame(frame, cell_w, cell_h):
-    (tmp_h, tmp_w) = frame.shape[:2]
-    if tmp_h > cell_h:
-        cuth = int((tmp_h - cell_h) * 0.5)
-    else:
-        cuth = 0
-    if tmp_w > cell_w:
-        cutw = int((tmp_w - cell_w) * 0.5)
-    else:
-        cutw = 0
-    return frame[cuth:cuth+int(round(cell_h)),cutw:cutw+int(round(cell_w))]
-
-# modifies bg
-def overlay_frames(bg, fg):
-    x = 0
-    y = 0
-    if fg.shape[1] < bg.shape[1]:
-        gap = (bg.shape[1] - fg.shape[1]) * 0.5
-        x += int(gap)
-    if fg.shape[0] < bg.shape[0]:
-        gap = (bg.shape[0] - fg.shape[0]) * 0.5
-        y += int(gap)
-    bg[y:y+fg.shape[0],x:x+fg.shape[1]] = fg
-    return bg
-
 # fixme: figure out why zooming on some landscape videos in some cases
 #        doesn't always fill the grid cell (see Coeur, individual grades.) 
 def render_combined_video(project, resolution, results_dir,
@@ -105,6 +62,14 @@ def render_combined_video(project, resolution, results_dir,
     output_fps = 30
     border = 10
     log("output video specs:", output_w, "x", output_h, "fps:", output_fps)
+
+    # load face locations if we hae a first run average
+    face_file = os.path.join(project, "results", "faces.json")
+    if os.path.exists(face_file):
+        with open(face_file, "r") as fp:
+            faces = json.load(fp)
+    else:
+        faces = None
     
     # load static pages if specified
     if title_page:
@@ -161,6 +126,13 @@ def render_combined_video(project, resolution, results_dir,
             path = os.path.join(project, file)
             if v.open(path):
                 durations.append(v.duration + offsets[i])
+            if not faces is None and basename in faces:
+                v.face.x = faces[basename]["x"]
+                v.face.y = faces[basename]["y"]
+                v.face.w = faces[basename]["w"]
+                v.face.h = faces[basename]["h"]
+                v.face.count = 1
+                v.face.precomputed = True
         videos.append(v)
         # else:
         #     # don't render but we still need a placeholder so videos
@@ -200,7 +172,20 @@ def render_combined_video(project, resolution, results_dir,
                     rotate = hints[basename]["rotate"]
                 if "video_shift" in hints[basename]:
                     video_shift = hints[basename]["video_shift"]
-            v.get_frame(output_time - offsets[i] - video_shift, rotate)
+                if "face_detect" in hints[basename]:
+                    face_detect = hints[basename]["face_detect"]
+            local_time = output_time - offsets[i] - video_shift
+            v.get_frame(local_time, rotate)
+            if faces is None:
+                face_detect = True
+            else:
+                face_detect = False
+            if basename in hints and "face_detect" in hints[basename]:
+                face_detect = hints[basename]["face_detect"]
+            if face_detect:
+                v.find_face(local_time)
+            else:
+                v.no_face()
 
         # compute placement/size for each video frame (static grid strategy)
         grid.update(videos, output_time)
@@ -220,28 +205,32 @@ def render_combined_video(project, resolution, results_dir,
                 scale_h = v.size_h / h
                 
                 #option = "fit"
-                option = "zoom"
+                #option = "zoom"
+                option = "face"
                 background = None
                 if option == "fit":
-                    v.shaped_frame = get_fit(frame, scale_w, scale_h)
+                    v.shaped_frame = video_crop.get_fit(frame, scale_w, scale_h)
                 elif option == "zoom":
                     if grid.cell_landscape != vid_landscape:
                         # background/wings full zoom
-                        background = get_zoom(frame, scale_w, scale_h)
+                        background = video_crop.get_zoom(frame, scale_w, scale_h)
                         background = cv2.blur(background, (43, 43))
-                        background = clip_frame(background,
-                                                v.size_w, v.size_h)
+                        background = video_crop.clip_frame(background,
+                                                           v.size_w, v.size_h)
                         # foreground compromise zoom/fit/arrangement
                         avg = (scale_w + scale_h) * 0.5
                         scale_w = avg
                         scale_h = avg
                         #print("scale:", scale_w, scale_h)
-                    frame_scale = get_zoom(frame, scale_w, scale_h)
-                    frame_scale = clip_frame(frame_scale, v.size_w, v.size_h)
+                    frame_scale = video_crop.get_zoom(frame, scale_w, scale_h)
+                    frame_scale = video_crop.clip_frame(frame_scale,
+                                                        v.size_w, v.size_h)
                     if background is None:
                         v.shaped_frame = frame_scale
                     else:
-                        v.shaped_frame = overlay_frames(background, frame_scale)
+                        v.shaped_frame = video_crop.overlay_frames(background, frame_scale)
+                elif option == "face":
+                    v.shaped_frame = video_crop.fit_face(v)
                 # cv2.imshow(video_names[i], frame_scale)
             else:
                 # bummer video with no frames?
@@ -319,6 +308,20 @@ def render_combined_video(project, resolution, results_dir,
     pbar.close()
     writer.close()
     log("gridded video (only) file: silent_video.mp4")
+
+    # save face location data (if not loaded from a file already)
+    if faces is None:
+        faces = {}
+        for v in videos:
+            if hasattr(v, "face"):
+                file = v.file
+                basename = os.path.basename(file)
+                (x, y, w, h) = v.face.get_face()
+                faces[basename] = { "x": x, "y": y, "w": w, "h": h,
+                                    "count": v.face.count,
+                                    "miss": v.face.miss }
+        with open(face_file, "w") as fp:
+            json.dump(faces, fp, indent=4)
     
 def merge(project, results_dir):
     log("video: merging video and audio into final result: gridded_video.mp4")

@@ -1,15 +1,14 @@
 import cv2
 import json
-import numpy as np
 import os
 import skvideo.io               # pip install sk-video
 
 from .logger import log
+from .video_face import FaceDetect
 
 class VideoTrack:
-    face_cascade = cv2.CascadeClassifier('/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml')
-    
     def __init__(self):
+        self.file = None
         self.reader = None
         self.place_x = None
         self.place_y = None
@@ -19,8 +18,10 @@ class VideoTrack:
         self.frame = []
         self.raw_frame = None
         self.shaped_frame = None
+        self.face = FaceDetect()
 
     def open(self, file):
+        self.file = file
         print("video:", file)
         metadata = skvideo.io.ffprobe(file)
         #print(metadata.keys())
@@ -66,21 +67,6 @@ class VideoTrack:
             log("warning: no first frame in:", file)
         return True
 
-    def find_face(self):
-        # print("find_face", self.frame.shape)
-        # print(self.face_cascade)
-        #eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
-        gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
-        faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
-        for (x,y,w,h) in faces:
-            # print(x,y,w,h)
-            self.frame = cv2.rectangle(np.array(self.frame), (x,y), (x+w,y+h), (255,0,0), 2)
-            #roi_gray = gray[y:y+h, x:x+w]
-            #roi_color = img[y:y+h, x:x+w]
-            #eyes = eye_cascade.detectMultiScale(roi_gray)
-            #for (ex,ey,ew,eh) in eyes:
-            #    cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
-
     def get_frame(self, time, rotate=0):
         # return the frame closest to the requested time
         frame_num = int(round(time * self.fps))
@@ -100,7 +86,6 @@ class VideoTrack:
                 self.frame = None
                 
         if self.frame is not None:
-            # self.find_face()
             if rotate == 0:
                 self.raw_frame = self.frame
             elif rotate == 90:
@@ -118,6 +103,14 @@ class VideoTrack:
             if self.raw_frame is not None:
                 self.raw_frame = (self.raw_frame * 0.9).astype('uint8')
 
+    def find_face(self, time):
+        result = self.face.find_face(self.raw_frame, time)
+        if not result is None:
+            self.raw_frame = result
+        
+    def no_face(self):
+        self.face.no_face(self.raw_frame)
+        
     def skip_secs(self, seconds):
         if not self.reader:
             return
