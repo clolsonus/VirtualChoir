@@ -19,7 +19,7 @@ def load(path):
                 if not name in hints:
                     hints[name] = {}
                 hint = row[1]
-                if hint in [ "gain", "rotate", "video_shift", "video_hide" ]:
+                if hint in [ "face_detect", "gain", "rotate", "video_shift", "video_hide" ]:
                     hints[name][hint] = float(row[2])
                 elif hint == "suppress":
                     if "suppress" in hints[name]:
