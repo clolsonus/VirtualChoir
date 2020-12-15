@@ -70,7 +70,7 @@ def combine(group, sync_offsets, mute_tracks,
             blend = 300         # ms
             seg = None
             start = 0
-            nwe_sample = None
+            new_sample = None
             for cmd in commands:
                 print("command:", cmd)
                 (t0, t1) = cmd
