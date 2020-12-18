@@ -5,10 +5,6 @@ import numpy as np
 import random
 
 class FaceDetect():
-    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(4,4))
-    min_count = 10
-    interval = 10
-    
     def __init__(self):
         self.l = 0
         self.r = 0
@@ -20,7 +16,6 @@ class FaceDetect():
         self.sumt = 0
         self.sumb = 0
         self.miss = 0
-        self.skip = random.randrange(self.interval)
         self.precomputed = False
 
     def update_average(self, l, r, t, b, scale=1.0):
@@ -34,21 +29,14 @@ class FaceDetect():
         self.t = self.sumt / self.count
         self.b = self.sumb / self.count
         
-    def get_face(self):
-        return(int(round(self.l)), int(round(self.r)),
-               int(round(self.t)), int(round(self.b)))
+    def get_face(self, scale=1.0):
+        return(int(round(self.l*scale)), int(round(self.r*scale)),
+               int(round(self.t*scale)), int(round(self.b*scale)))
         
     def find_face(self, raw_frame):
         if raw_frame is None:
             return None
         
-        self.skip += 1
-        if self.skip % self.interval != 0:
-            return None
-        
-        if self.count < self.min_count:
-            print("haven't found %d matches yet ..." % self.min_count)
-
         # shrink the frame if bigger than target area
         #target_area = 1138*640
         target_area = 853*480
@@ -79,7 +67,6 @@ class FaceDetect():
             b = rect.bottom()
             frame = cv2.rectangle(np.array(frame), (l, t), (r, b),
                                   (128,128,255), 2)
-        cv2.imshow('detections', frame)
             
         if len(detections):
             l = detections[0].left()
@@ -99,8 +86,10 @@ class FaceDetect():
         else:
             self.miss += 1
 
-        (l, r, t, b) = self.get_face()
-        raw_frame = cv2.rectangle(np.array(raw_frame), (l, t), (r, b), (255,255,255), 2)
+        (l, r, t, b) = self.get_face(scale)
+        frame = cv2.rectangle(np.array(frame), (l, t), (r, b), (255,255,255), 2)
+        cv2.imshow('face detection', frame)
+        
         return raw_frame
             
     def no_face(self, raw_frame):
