@@ -108,7 +108,7 @@ def combine(group, sync_offsets, mute_tracks,
         print(i, "max:", np.max(y))
         #print(" ", y.shape)
         if y_mixed is None:
-            y_mixed = y
+            y_mixed = y * track_gain
         else:
             # extend y_mixed array length if needed
             if y_mixed.shape[0] < y.shape[0]:
