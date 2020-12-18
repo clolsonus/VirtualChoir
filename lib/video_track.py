@@ -4,7 +4,7 @@ import os
 import skvideo.io               # pip install sk-video
 
 from .logger import log
-from .video_face import FaceDetect
+from .video_face_dlib import FaceDetect
 
 class VideoTrack:
     def __init__(self):
@@ -103,8 +103,8 @@ class VideoTrack:
             if self.raw_frame is not None:
                 self.raw_frame = (self.raw_frame * 0.9).astype('uint8')
 
-    def find_face(self, time):
-        result = self.face.find_face(self.raw_frame, time)
+    def find_face(self):
+        result = self.face.find_face(self.raw_frame)
         if not result is None:
             self.raw_frame = result
         
