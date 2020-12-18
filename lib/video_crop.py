@@ -55,23 +55,24 @@ def overlay_frames(bg, fg):
 def fit_face(v):
     (frameh, framew) = v.raw_frame.shape[:2]
     frame_ar = framew / frameh
+    size_ar = v.size_w / v.size_h
     if v.face.count > 0:
-        (x, y, w, h) = v.face.get_face()
+        (l, r, t, b) = v.face.get_face()
     else:
-        x = 0
-        y = 0
-        h = frameh
-        w = framew
-    v.raw_frame = cv2.rectangle(np.array(v.raw_frame), (x,y), (x+w,y+h),
-                                (0,255,0), 2)
+        l = 0
+        r = framew
+        t = 0
+        b = frameh
+    #v.raw_frame = cv2.rectangle(np.array(v.raw_frame), (x,y), (x+w,y+h), (0,255,0), 2)
     #print(" ", x,y,w,h)
 
+    w = r - l
+    h = b - t
     # ideal shape to pad around face
-    padw = w * 0.4
-    padh = h * 0.4
-    wantw = int(round(w + 2*padw))
+    padw = w * 0.5
+    padh = h * 0.5 
     wanth = int(round(h + 3*padh))
-    face_ar = wantw / wanth
+    wantw = int(round(wanth * size_ar))
 
     # expand our area to match the raw frame aspect ratio
     # if frame_ar < face_ar:
@@ -81,27 +82,27 @@ def fit_face(v):
     #     wantw = int(round(wanth * frame_ar))
 
     # compute the upper corner to position the face
-    wantx = x - int(round((wantw - w) * 0.5))
-    wanty = y - int(round((wanth - h) * 0.333))
+    wantl = l - int(round((wantw - w) * 0.5))
+    wantt = t - int(round((wanth - h) * 0.333))
 
     # don't ask for more than the frame has
     if wantw > framew:
         wantw = framew
     if wanth > frameh:
         wanth = frameh
-    if wantx < 0:
-        wantx = 0
-    if wantx + wantw > framew:
-        wantx = framew - wantw
-    if wanty < 0:
-        wanty = 0
-    if wanty + wanth > frameh:
-        wanty = frameh - wanth
+    if wantl < 0:
+        wantl = 0
+    if wantl + wantw > framew:
+        wantl = framew - wantw
+    if wantt < 0:
+        wantt = 0
+    if wantt + wanth > frameh:
+        wantt = frameh - wanth
     # v.raw_frame = cv2.rectangle(np.array(v.raw_frame), (wantx,wanty), (wantx+wantw,wanty+wanth), (255,255,255), 2)
     #cv2.imshow(str(v.reader), v.raw_frame)
 
     # best fit we can make on the face with original aspect ratio
-    crop = v.raw_frame[wanty:wanty+wanth, wantx:wantx+wantw]
+    crop = v.raw_frame[wantt:wantt+wanth, wantl:wantl+wantw]
     #cv2.imshow(str(v.reader) + " crop", crop)
 
     # now cram it into the available space (lossy/zoom)
