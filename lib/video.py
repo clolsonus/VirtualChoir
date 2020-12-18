@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from .logger import log
 from . import video_crop
+from . import video_faces
 from .video_track import VideoTrack
 from .video_grid import VideoGrid
 from .video_spiral import VideoSpiral
@@ -63,13 +64,8 @@ def render_combined_video(project, resolution, results_dir,
     border = 10
     log("output video specs:", output_w, "x", output_h, "fps:", output_fps)
 
-    # load face locations if we hae a first run average
-    face_file = os.path.join(project, "results", "faces.json")
-    if os.path.exists(face_file):
-        with open(face_file, "r") as fp:
-            faces = json.load(fp)
-    else:
-        faces = None
+    # load/find face locations
+    faces = video_faces.find_faces(project, video_names, hints)
     
     # load static pages if specified
     if title_page:
@@ -127,11 +123,11 @@ def render_combined_video(project, resolution, results_dir,
             if v.open(path):
                 durations.append(v.duration + offsets[i])
             if not faces is None and basename in faces:
-                v.face.x = faces[basename]["x"]
-                v.face.y = faces[basename]["y"]
-                v.face.w = faces[basename]["w"]
-                v.face.h = faces[basename]["h"]
-                v.face.count = 1
+                v.face.l = faces[basename]["left"]
+                v.face.r = faces[basename]["right"]
+                v.face.t = faces[basename]["top"]
+                v.face.b = faces[basename]["bottom"]
+                v.face.count = faces[basename]["count"]
                 v.face.precomputed = True
         videos.append(v)
         # else:
@@ -176,16 +172,6 @@ def render_combined_video(project, resolution, results_dir,
                     face_detect = hints[basename]["face_detect"]
             local_time = output_time - offsets[i] - video_shift
             v.get_frame(local_time, rotate)
-            if faces is None:
-                face_detect = True
-            else:
-                face_detect = False
-            if basename in hints and "face_detect" in hints[basename]:
-                face_detect = hints[basename]["face_detect"]
-            if face_detect:
-                v.find_face(local_time)
-            else:
-                v.no_face()
 
         # compute placement/size for each video frame (static grid strategy)
         grid.update(videos, output_time)
@@ -230,7 +216,20 @@ def render_combined_video(project, resolution, results_dir,
                     else:
                         v.shaped_frame = video_crop.overlay_frames(background, frame_scale)
                 elif option == "face":
+                    basename = os.path.basename(video_names[i])
+                    if basename in hints and "face_detect" in hints[basename]:
+                        use_face = (hints[basename]["face_detect"] > 0.01)
+                        if not use_face:
+                            v.no_face()
                     v.shaped_frame = video_crop.fit_face(v)
+                    if v.shaped_frame.shape[1] < v.size_w:
+                        # need background fill
+                        background = video_crop.get_zoom(frame,
+                                                         scale_w, scale_h)
+                        background = cv2.blur(background, (43, 43))
+                        background = video_crop.clip_frame(background,
+                                                           v.size_w, v.size_h)
+                        v.shaped_frame = video_crop.overlay_frames(background, v.shaped_frame)
                 # cv2.imshow(video_names[i], frame_scale)
             else:
                 # bummer video with no frames?
@@ -308,20 +307,6 @@ def render_combined_video(project, resolution, results_dir,
     pbar.close()
     writer.close()
     log("gridded video (only) file: silent_video.mp4")
-
-    # save face location data (if not loaded from a file already)
-    if faces is None:
-        faces = {}
-        for v in videos:
-            if hasattr(v, "face"):
-                file = v.file
-                basename = os.path.basename(file)
-                (x, y, w, h) = v.face.get_face()
-                faces[basename] = { "x": x, "y": y, "w": w, "h": h,
-                                    "count": v.face.count,
-                                    "miss": v.face.miss }
-        with open(face_file, "w") as fp:
-            json.dump(faces, fp, indent=4)
     
 def merge(project, results_dir):
     log("video: merging video and audio into final result: gridded_video.mp4")
