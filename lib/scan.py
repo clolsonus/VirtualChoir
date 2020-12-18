@@ -4,7 +4,7 @@ from .logger import log
 
 # find all the project clips (todo: recurse)
 audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "ogg", "wav" ]
-video_extensions = [ "avi", "mov", "mp4", "webm" ]
+video_extensions = [ "avi", "mov", "mp4", "qt", "webm" ]
 audacity_extension = "aup"
 ignore_extensions = [ "au", "lof", "txt", "zip" ]
 ignore_files = [ "full-mix", "gridded_video", "mixed_audio", "silent_video" ]
@@ -129,7 +129,11 @@ def check_for_newer(path, ref_file):
         return True
     for file in sorted(os.listdir(path)):
         fullname = os.path.join(path, file)
-        if is_newer(fullname, ref_file):
+        if os.path.isdir(fullname) and file == "results":
+            # don't consider newer files in the results dir a reason
+            # to flag a dependency is newer
+            print("ignoring:", fullname)
+        elif is_newer(fullname, ref_file):
             print(fullname, "is newer than", ref_file)
             return True
     return False
