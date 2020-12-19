@@ -56,7 +56,7 @@ def fit_face(v):
     # try something crazy (subpixel cropping by scaling up 4x and then
     # back down)
     scale = 2.0
-    superscale = cv2.resize(v.raw_frame, (0,0), fx=scale, fy=scale,
+    superscale = cv2.resize(v.raw_frame, None, fx=scale, fy=scale,
                             interpolation=cv2.INTER_AREA)
     (frameh, framew) = superscale.shape[:2]
     frame_ar = framew / frameh
@@ -77,7 +77,7 @@ def fit_face(v):
     padw = w * 0.5
     padh = h * 0.5 
     wanth = h + 3*padh
-    wantw = wanth * size_ar
+    wantw = wanth * size_ar + 1
 
     # expand our area to match the raw frame aspect ratio
     # if frame_ar < face_ar:
