@@ -123,12 +123,8 @@ def render_combined_video(project, resolution, results_dir,
             if v.open(path):
                 durations.append(v.duration + offsets[i])
             if not faces is None and basename in faces:
-                v.face.l = faces[basename]["left"]
-                v.face.r = faces[basename]["right"]
-                v.face.t = faces[basename]["top"]
-                v.face.b = faces[basename]["bottom"]
-                v.face.count = faces[basename]["count"]
-                v.face.precomputed = True
+                v.face.data = faces[basename]
+                v.face.update_interp()
         videos.append(v)
         # else:
         #     # don't render but we still need a placeholder so videos

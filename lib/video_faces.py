@@ -35,27 +35,21 @@ def find_faces(project, video_names, hints):
         if not v.open(path):
             log("cannot open video:", file)
             continue
-        
+
         # walk through video by time
         pbar = tqdm(total=v.duration, smoothing=0.05)
-        t = 0
+        time = 0
         dt = v.duration / num_samples
         if dt < 1:
             # no more than onen sample a second
             dt = 1
         while not v.frame is None:
-            v.get_frame(t, rotate)
-            v.face.find_face(v.raw_frame)
+            v.get_frame(time, rotate)
+            v.face.find_face(v.raw_frame, time)
             pbar.update(dt)
-            t += dt
-            cv2.waitKey(1)
+            time += dt
         pbar.close()
-        
-        (l, r, t, b) = v.face.get_face()
-        faces[basename] = { "left": l, "right": r,
-                            "top": t, "bottom": b,
-                            "count": v.face.count,
-                            "miss": v.face.miss }
+        faces[basename] = v.face.data
         
         # save/cache face location data (each iteration so we can
         # restart if needed)

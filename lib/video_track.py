@@ -67,17 +67,19 @@ class VideoTrack:
             log("warning: no first frame in:", file)
         return True
 
-    def get_frame(self, time, rotate=0):
+    def get_frame(self, local_time, rotate=0):
         # return the frame closest to the requested time
-        frame_num = int(round(time * self.fps))
+        frame_num = int(round(local_time * self.fps))
         # print("request frame num:", frame_num)
         if frame_num < 0:
             self.raw_frame = None
+            self.local_time = None
             return
         while self.frame_counter < frame_num and not self.frame is None:
             try:
                 self.frame = self.reader._readFrame()
                 self.frame = self.frame[:,:,::-1]
+                self.local_time = local_time
                 self.frame_counter += 1
                 if not len(self.frame):
                     self.frame = None

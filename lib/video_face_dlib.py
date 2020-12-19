@@ -1,39 +1,94 @@
 import cv2
 import dlib
 import math
+import matplotlib.pyplot as plt
 import numpy as np
 import random
 
+def gen_func( coeffs, min, max, steps ):
+    if abs(max-min) < 0.0001:
+        max = min + 0.1
+    xvals = []
+    yvals = []
+    step = (max - min) / steps
+    func = np.poly1d(coeffs)
+    for x in np.arange(min, max+step, step):
+        y = func(x)
+        xvals.append(x)
+        yvals.append(y)
+    return xvals, yvals
+
 class FaceDetect():
     def __init__(self):
-        self.l = 0
-        self.r = 0
-        self.t = 0
-        self.b = 0
+        self.data = []
         self.count = 0
-        self.suml = 0
-        self.sumr = 0
-        self.sumt = 0
-        self.sumb = 0
         self.miss = 0
-        self.precomputed = False
-
-    def update_average(self, l, r, t, b, scale=1.0):
+        self.left_func = None
+        self.right_func = None
+        self.top_func = None
+        self.bottom_func = None
+        
+    def data_append(self, time, l, r, t, b, scale=1.0):
         self.count += 1
-        self.suml += (l / scale)
-        self.sumr += (r / scale)
-        self.sumt += (t / scale)
-        self.sumb += (b / scale)
-        self.l = self.suml / self.count
-        self.r = self.sumr / self.count
-        self.t = self.sumt / self.count
-        self.b = self.sumb / self.count
+        record = {
+            "time": time, 
+            "left": l / scale, "right": r / scale,
+            "top": t / scale, "bottom": b / scale,
+            "count": self.count, "miss": self.miss
+        }
+        self.data.append( record )
+
+    def update_interp(self):
+        degree = 2
+        self.count = len(self.data)
+        if self.count <= degree:
+            return
+        time = []
+        left = []
+        right = []
+        top = []
+        bottom = []
+        for record in self.data:
+            time.append(record["time"])
+            left.append(record["left"])
+            right.append(record["right"])
+            top.append(record["top"])
+            bottom.append(record["bottom"])
+        left_fit, res, _, _, _ = np.polyfit( time, left, degree, full=True )
+        self.left_func = np.poly1d(left_fit)
+        #print("left fit:", left_fit)
+        #print("left res:", res)
+        xvals, yvals = gen_func(left_fit,time[0], time[-1], 1000)
+        plt.scatter(time, left, marker='*', label="Left")
+        plt.plot(xvals, yvals, label="Left Fit")
+        right_fit, res, _, _, _ = np.polyfit( time, right, degree, full=True )
+        self.right_func = np.poly1d(right_fit)
+        #xvals, yvals = gen_func(right_fit,time[0], time[-1], 1000)
+        #plt.scatter(time, right, marker='*', label="Right")
+        #plt.plot(xvals, yvals, label="Right Fit")
+        top_fit, res, _, _, _ = np.polyfit( time, top, degree, full=True )
+        self.top_func = np.poly1d(top_fit)
+        #xvals, yvals = gen_func(top_fit,time[0], time[-1], 1000)
+        #plt.scatter(time, top, marker='*', label="Top")
+        #plt.plot(xvals, yvals, label="Top Fit")
+        bottom_fit, res, _, _, _ = np.polyfit( time, bottom, degree, full=True )
+        self.bottom_func = np.poly1d(bottom_fit)
+        #xvals, yvals = gen_func(bottom_fit,time[0], time[-1], 1000)
+        #plt.scatter(time, bottom, marker='*', label="Bottom")
+        #plt.plot(xvals, yvals, label="Bottom Fit")
+        #plt.legend()
+        #plt.show()
         
-    def get_face(self, scale=1.0):
-        return(int(round(self.l*scale)), int(round(self.r*scale)),
-               int(round(self.t*scale)), int(round(self.b*scale)))
+    def get_face(self, time, scale=1.0):
+        if self.left_func is None or self.right_func is None or self.top_func is None or self.bottom_func is None:
+            return None
+        l = self.left_func(time)*scale
+        r = self.right_func(time)*scale
+        t = self.top_func(time)*scale
+        b = self.bottom_func(time)*scale
+        return l, r, t, b
         
-    def find_face(self, raw_frame):
+    def find_face(self, raw_frame, time):
         if raw_frame is None:
             return None
         
@@ -82,19 +137,18 @@ class FaceDetect():
                     t = rect.top()
                 if rect.bottom() > b:
                     b = rect.bottom()
-            self.update_average(l, r, t, b, scale)
+            self.data_append(time, l, r, t, b, scale)
         else:
             self.miss += 1
+            return None
 
-        (l, r, t, b) = self.get_face(scale)
-        frame = cv2.rectangle(np.array(frame), (l, t), (r, b), (255,255,255), 2)
-        cv2.imshow('face detection', frame)
+        self.update_interp()
+        result = self.get_face(time, scale)
+        if not result is None:
+            (l, r, t, b) = result
+            frame = cv2.rectangle(np.array(frame), (int(l), int(t)), (int(r), int(b)), (255,255,255), 2)
         
-        return raw_frame
-            
-    def no_face(self, raw_frame):
-        if not raw_frame is None:
-            self.x = 0
-            self.y = 0
-            self.h = raw_frame.shape[0]
-            self.w = raw_frame.shape[1]
+        cv2.imshow('face detection', frame)
+        cv2.waitKey(1)
+
+        return (l, r, t, b)

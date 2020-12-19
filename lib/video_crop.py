@@ -11,7 +11,7 @@ def get_fit(frame, scale_w, scale_h):
                             interpolation=cv2.INTER_AREA)
     return result
 
-# return a scaled versino of the frame that stretches vertically and
+# return a scaled version of the frame that stretches vertically and
 # is cropped (if needed) horizontally
 def get_fit_height(frame, scale_h):
     result = cv2.resize(frame, (0,0), fx=scale_h, fy=scale_h,
@@ -30,11 +30,11 @@ def get_zoom(frame, scale_w, scale_h):
 def clip_frame(frame, cell_w, cell_h):
     (tmp_h, tmp_w) = frame.shape[:2]
     if tmp_h > cell_h:
-        cuth = int((tmp_h - cell_h) * 0.5)
+        cuth = int(round((tmp_h - cell_h) * 0.5))
     else:
         cuth = 0
     if tmp_w > cell_w:
-        cutw = int((tmp_w - cell_w) * 0.5)
+        cutw = int(round((tmp_w - cell_w) * 0.5))
     else:
         cutw = 0
     return frame[cuth:cuth+int(round(cell_h)),cutw:cutw+int(round(cell_w))]
@@ -56,8 +56,8 @@ def fit_face(v):
     (frameh, framew) = v.raw_frame.shape[:2]
     frame_ar = framew / frameh
     size_ar = v.size_w / v.size_h
-    if v.face.count > 0:
-        (l, r, t, b) = v.face.get_face()
+    if v.face.count > 0 and not v.local_time is None:
+        (l, r, t, b) = v.face.get_face(v.local_time)
     else:
         l = 0
         r = framew
@@ -71,8 +71,8 @@ def fit_face(v):
     # ideal shape to pad around face
     padw = w * 0.5
     padh = h * 0.5 
-    wanth = int(round(h + 3*padh))
-    wantw = int(round(wanth * size_ar))
+    wanth = h + 3*padh
+    wantw = wanth * size_ar
 
     # expand our area to match the raw frame aspect ratio
     # if frame_ar < face_ar:
@@ -82,10 +82,14 @@ def fit_face(v):
     #     wantw = int(round(wanth * frame_ar))
 
     # compute the upper corner to position the face
-    wantl = l - int(round((wantw - w) * 0.5))
-    wantt = t - int(round((wanth - h) * 0.333))
+    wantl = l - (wantw - w) * 0.5
+    wantt = t - (wanth - h) * 0.333
 
     # don't ask for more than the frame has
+    wantl = int(round(wantl))
+    wantt = int(round(wantt))
+    wantw = int(round(wantw))
+    wanth = int(round(wanth))
     if wantw > framew:
         wantw = framew
     if wanth > frameh:
