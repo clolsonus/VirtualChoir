@@ -53,11 +53,16 @@ def overlay_frames(bg, fg):
     return bg
 
 def fit_face(v):
-    (frameh, framew) = v.raw_frame.shape[:2]
+    # try something crazy (subpixel cropping by scaling up 4x and then
+    # back down)
+    scale = 2.0
+    superscale = cv2.resize(v.raw_frame, (0,0), fx=scale, fy=scale,
+                            interpolation=cv2.INTER_AREA)
+    (frameh, framew) = superscale.shape[:2]
     frame_ar = framew / frameh
     size_ar = v.size_w / v.size_h
     if v.face.count > 0 and not v.local_time is None:
-        (l, r, t, b) = v.face.get_face(v.local_time)
+        (l, r, t, b) = v.face.get_face(v.local_time, scale)
     else:
         l = 0
         r = framew
@@ -106,7 +111,7 @@ def fit_face(v):
     #cv2.imshow(str(v.reader), v.raw_frame)
 
     # best fit we can make on the face with original aspect ratio
-    crop = v.raw_frame[wantt:wantt+wanth, wantl:wantl+wantw]
+    crop = superscale[wantt:wantt+wanth, wantl:wantl+wantw]
     #cv2.imshow(str(v.reader) + " crop", crop)
 
     # now cram it into the available space (lossy/zoom)
