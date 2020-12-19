@@ -77,11 +77,11 @@ def render_combined_video(project, resolution, results_dir,
         scale_w = output_w / w
         scale_h = output_h / h
         if scale_w < scale_h:
-            title_scale = cv2.resize(title_rgb, (0,0), fx=scale_w,
+            title_scale = cv2.resize(title_rgb, None, fx=scale_w,
                                      fy=scale_w,
                                      interpolation=cv2.INTER_AREA)
         else:
-            title_scale = cv2.resize(title_rgb, (0,0), fx=scale_h,
+            title_scale = cv2.resize(title_rgb, None, fx=scale_h,
                                      fy=scale_h,
                                      interpolation=cv2.INTER_AREA)
         x = int((output_w - title_scale.shape[1]) / 2)
@@ -98,11 +98,11 @@ def render_combined_video(project, resolution, results_dir,
         scale_w = output_w / w
         scale_h = output_h / h
         if scale_w < scale_h:
-            credits_scale = cv2.resize(credits_rgb, (0,0), fx=scale_w,
+            credits_scale = cv2.resize(credits_rgb, None, fx=scale_w,
                                      fy=scale_w,
                                      interpolation=cv2.INTER_AREA)
         else:
-            credits_scale = cv2.resize(credits_rgb, (0,0), fx=scale_h,
+            credits_scale = cv2.resize(credits_rgb, None, fx=scale_h,
                                      fy=scale_h,
                                      interpolation=cv2.INTER_AREA)
         x = int((output_w - credits_scale.shape[1]) / 2)
@@ -406,7 +406,7 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
                     #print("area:", area, "target_area:", target_area)
                     if area > target_area:
                         scale = math.sqrt( target_area / area )
-                        frame = cv2.resize(frame, (0,0), fx=scale, fy=scale,
+                        frame = cv2.resize(frame, None, fx=scale, fy=scale,
                                            interpolation=cv2.INTER_AREA)
             except:
                 frame = None

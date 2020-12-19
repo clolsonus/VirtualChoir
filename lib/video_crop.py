@@ -4,26 +4,26 @@ import numpy as np
 # return a scaled versino of the frame that fits
 def get_fit(frame, scale_w, scale_h):
     if scale_w < scale_h:
-        result = cv2.resize(frame, (0,0), fx=scale_w, fy=scale_w,
+        result = cv2.resize(frame, None, fx=scale_w, fy=scale_w,
                             interpolation=cv2.INTER_AREA)
     else:
-        result = cv2.resize(frame, (0,0), fx=scale_h, fy=scale_h,
+        result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
                             interpolation=cv2.INTER_AREA)
     return result
 
 # return a scaled version of the frame that stretches vertically and
 # is cropped (if needed) horizontally
 def get_fit_height(frame, scale_h):
-    result = cv2.resize(frame, (0,0), fx=scale_h, fy=scale_h,
+    result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
                         interpolation=cv2.INTER_AREA)
     return result
 
 def get_zoom(frame, scale_w, scale_h):
     if scale_w < scale_h:
-        result = cv2.resize(frame, (0,0), fx=scale_h, fy=scale_h,
+        result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
                             interpolation=cv2.INTER_AREA)
     else:
-        result = cv2.resize(frame, (0,0), fx=scale_w, fy=scale_w,
+        result = cv2.resize(frame, None, fx=scale_w, fy=scale_w,
                             interpolation=cv2.INTER_AREA)
     return result
         

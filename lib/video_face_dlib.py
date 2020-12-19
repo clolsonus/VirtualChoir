@@ -99,7 +99,7 @@ class FaceDetect():
         #print("area:", area, "target_area:", target_area)
         if area > target_area:
             scale = math.sqrt( target_area / area )
-            frame = cv2.resize(raw_frame, (0,0), fx=scale, fy=scale,
+            frame = cv2.resize(raw_frame, None, fx=scale, fy=scale,
                                interpolation=cv2.INTER_AREA)
         else:
             scale = 1
