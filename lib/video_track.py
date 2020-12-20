@@ -19,6 +19,7 @@ class VideoTrack:
         self.raw_frame = None
         self.shaped_frame = None
         self.face = FaceDetect()
+        self.local_time = 0.0
 
     def open(self, file):
         self.file = file
@@ -70,10 +71,9 @@ class VideoTrack:
     def get_frame(self, local_time, rotate=0):
         # return the frame closest to the requested time
         frame_num = int(round(local_time * self.fps))
-        # print("request frame num:", frame_num)
         if frame_num < 0:
             self.raw_frame = None
-            self.local_time = None
+            self.local_time = 0.0
             return
         while self.frame_counter < frame_num and not self.frame is None:
             try:
