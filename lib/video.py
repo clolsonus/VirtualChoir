@@ -61,7 +61,7 @@ def render_combined_video(project, resolution, results_dir,
         output_w = 1920
         output_h = 1080
     output_fps = 30
-    border = 10
+    border = 6
     log("output video specs:", output_w, "x", output_h, "fps:", output_fps)
 
     # load/find face locations
