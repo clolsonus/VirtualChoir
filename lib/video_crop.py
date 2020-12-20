@@ -55,7 +55,7 @@ def overlay_frames(bg, fg):
 def fit_face(v):
     # try something crazy (subpixel cropping by scaling up 4x and then
     # back down)
-    scale = 2.0
+    scale = 4.0
     superscale = cv2.resize(v.raw_frame, None, fx=scale, fy=scale,
                             interpolation=cv2.INTER_AREA)
     (frameh, framew) = superscale.shape[:2]
