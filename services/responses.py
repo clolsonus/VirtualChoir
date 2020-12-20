@@ -168,6 +168,11 @@ def run_job(settings, request):
 
     # generate list of files
     file_list = []
+    # include the subfolder/group mixes
+    for file in sorted(os.listdir(work_dir)):
+        if file.endswith("-mix.mp3"):
+            file_list.append( os.path.join(work_dir, file) )
+    # include the main results
     for file in sorted(os.listdir(results_dir)):
         if not aligned_tracks and file.startswith("aligned_"):
             pass
