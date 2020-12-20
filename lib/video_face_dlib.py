@@ -39,7 +39,7 @@ class FaceDetect():
         self.data.append( record )
 
     def update_interp(self):
-        degree = 2
+        degree = 5
         self.count = len(self.data)
         if self.count <= degree:
             return
