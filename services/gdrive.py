@@ -184,6 +184,8 @@ class gdrive():
                 self.sync_folder(newurl, newpath)
             elif item["mimeType"].endswith("shortcut"):
                 print("Shortcut encountered, don't know how to deal with this file:", item["name"])
+            elif "google-apps." in item["mimeType"]:
+                print("skipping google app file")
             else:
                 # fetch file
                 print("%s (%s) %.0f Kb" % (item["name"], item["mimeType"], int(item["size"]) / 1024 ))
