@@ -55,7 +55,7 @@ def overlay_frames(bg, fg):
 def fit_face(v):
     # try something crazy (subpixel cropping by scaling up 4x and then
     # back down)
-    scale = 4.0
+    scale = 2.0
     superscale = cv2.resize(v.raw_frame, None, fx=scale, fy=scale,
                             interpolation=cv2.INTER_AREA)
     (frameh, framew) = superscale.shape[:2]
@@ -116,6 +116,9 @@ def fit_face(v):
 
     # now cram it into the available space (lossy/zoom)
     croph, cropw = crop.shape[:2]
+    if croph == 0:
+        # debug
+        print("name:", v.file, "face:", l, r, t, b)
     scale_h = v.size_h / croph
     final = get_fit_height(crop, scale_h)
     final = clip_frame(final, v.size_w, v.size_h)
