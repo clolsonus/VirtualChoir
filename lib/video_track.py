@@ -10,6 +10,7 @@ class VideoTrack:
     def __init__(self):
         self.file = None
         self.reader = None
+        self.displayw = None
         self.place_x = None
         self.place_y = None
         self.size_w = 0
@@ -29,7 +30,7 @@ class VideoTrack:
         if not "video" in metadata:
             log("No video track:", file)
             return False
-        #print(json.dumps(metadata["video"], indent=4))
+        print(json.dumps(metadata["video"], indent=4))
         fps_string = metadata['video']['@r_frame_rate']
         (num, den) = fps_string.split('/')
         self.fps = float(num) / float(den)
@@ -49,6 +50,11 @@ class VideoTrack:
         codec = metadata['video']['@codec_long_name']
         self.w = int(metadata['video']['@width'])
         self.h = int(metadata['video']['@height'])
+        if '@sample_aspect_ratio' in metadata['video']:
+            dw, _ = metadata['video']['@sample_aspect_ratio'].split(':')
+            if int(dw) > self.w:
+                self.displayw = int(dw)
+            self.w = self.displayw
         if '@duration' in metadata['video']:
             self.duration = float(metadata['video']['@duration'])
         else:
@@ -79,6 +85,9 @@ class VideoTrack:
             try:
                 self.frame = self.reader._readFrame()
                 self.frame = self.frame[:,:,::-1]
+                if not self.displayw is None:
+                    self.frame = cv2.resize(self.frame, (self.displayw, self.h),
+                                            interpolation=cv2.INTER_AREA)
                 self.local_time = local_time
                 self.frame_counter += 1
                 if not len(self.frame):
