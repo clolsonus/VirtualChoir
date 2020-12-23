@@ -86,6 +86,23 @@ class FaceDetect():
         r = self.right_func(time)*scale
         t = self.top_func(time)*scale
         b = self.bottom_func(time)*scale
+        w = r - l
+        h = b - t
+        if h > 0:
+            ar = w/h
+        else:
+            ar = 1
+        if ar < 0.9 or ar > 1.1:
+            # try to return biggest square centered if face area not square
+            x = (l + r)*0.5
+            y = (t + b)*0.5
+            if ar > 1:
+                # expand height
+                t = y - w*0.5
+                b = y + w*0.5
+            else:
+                l = x - h*0.5
+                r = x + h*0.5
         return l, r, t, b
         
     def find_face(self, raw_frame, time):

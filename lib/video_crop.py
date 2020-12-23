@@ -5,26 +5,26 @@ import numpy as np
 def get_fit(frame, scale_w, scale_h):
     if scale_w < scale_h:
         result = cv2.resize(frame, None, fx=scale_w, fy=scale_w,
-                            interpolation=cv2.INTER_AREA)
+                            interpolation=cv2.INTER_CUBIC)
     else:
         result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
-                            interpolation=cv2.INTER_AREA)
+                            interpolation=cv2.INTER_CUBIC)
     return result
 
 # return a scaled version of the frame that stretches vertically and
 # is cropped (if needed) horizontally
 def get_fit_height(frame, scale_h):
     result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
-                        interpolation=cv2.INTER_AREA)
+                        interpolation=cv2.INTER_CUBIC)
     return result
 
 def get_zoom(frame, scale_w, scale_h):
     if scale_w < scale_h:
         result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
-                            interpolation=cv2.INTER_AREA)
+                            interpolation=cv2.INTER_CUBIC)
     else:
         result = cv2.resize(frame, None, fx=scale_w, fy=scale_w,
-                            interpolation=cv2.INTER_AREA)
+                            interpolation=cv2.INTER_CUBIC)
     return result
         
 def clip_frame(frame, cell_w, cell_h):
@@ -53,21 +53,31 @@ def overlay_frames(bg, fg):
     return bg
 
 def fit_face(v):
-    # try something crazy (subpixel cropping by scaling up 4x and then
-    # back down)
-    scale = 2.0
-    superscale = cv2.resize(v.raw_frame, None, fx=scale, fy=scale,
-                            interpolation=cv2.INTER_AREA)
-    (frameh, framew) = superscale.shape[:2]
-    frame_ar = framew / frameh
-    size_ar = v.size_w / v.size_h
     if v.face.count > 0 and not v.local_time is None:
-        (l, r, t, b) = v.face.get_face(v.local_time, scale)
+        (l, r, t, b) = v.face.get_face(v.local_time, 1.0)
     else:
         l = 0
         r = framew
         t = 0
         b = frameh
+    face_area = (r - l) * (b - t)
+    cell_area = v.size_w * v.size_h
+    if face_area < 2 * cell_area:
+        # try something crazy (subpixel cropping by scaling up and
+        # then back down)
+        scale = 2.0
+        superscale = cv2.resize(v.raw_frame, None, fx=scale, fy=scale,
+                                interpolation=cv2.INTER_CUBIC)
+        l = l * scale
+        r = r * scale
+        t = t * scale
+        b = b * scale
+    else:
+        superscale = v.raw_frame
+    (frameh, framew) = superscale.shape[:2]
+    frame_ar = framew / frameh
+    size_ar = v.size_w / v.size_h
+        
     #v.raw_frame = cv2.rectangle(np.array(v.raw_frame), (x,y), (x+w,y+h), (0,255,0), 2)
     #print(" ", x,y,w,h)
 

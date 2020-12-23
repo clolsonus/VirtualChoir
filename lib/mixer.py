@@ -32,7 +32,20 @@ def combine(group, sync_offsets, mute_tracks,
                 
     y_mixed = None
     mixed_count = 0
-    for i, sample in enumerate(group.sample_list):
+    for i, file in enumerate(group.name_list):
+        name = os.path.basename(group.name_list[i])
+        basefile, ext = os.path.splitext(name)
+        canon_name = os.path.join(group.path, "cache",
+                                  basefile + "-canon.mp3")
+        clean_name = os.path.join(group.path, "cache",
+                                  basefile + "-clean.mp3")
+        if os.path.exists(clean_name):
+            sample = group.load(clean_name)
+        elif os.path.exists(canon_name):
+            sample = group.load(canon_name)
+        else:
+            log("cannot find canonical audio or cleaned audio, die!")
+            quit()
         if group.name_list[i] in mute_tracks:
             log("skipping muted:", group.name_list[i])
             continue
@@ -65,7 +78,8 @@ def combine(group, sync_offsets, mute_tracks,
                 print(cmd)
                 commands.append( (cmd[0]+offset_sec, cmd[1]+offset_sec) )
         sample = sample.fade_in(1000)
-        if len(commands):
+        if False and len(commands):
+            # temporarily skip non-music suppression
             print("commands:", commands)
             blend = 300         # ms
             seg = None

@@ -4,7 +4,7 @@ from .logger import log
 
 # find all the project clips (todo: recurse)
 audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "ogg", "wav" ]
-video_extensions = [ "avi", "mov", "mp4", "qt", "webm" ]
+video_extensions = [ "avi", "m4v", "mov", "mp4", "qt", "webm" ]
 audacity_extension = "aup"
 ignore_extensions = [ "au", "lof", "txt", "zip" ]
 ignore_files = [ "full-mix", "gridded_video", "mixed_audio", "silent_video" ]

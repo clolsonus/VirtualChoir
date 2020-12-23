@@ -72,8 +72,12 @@ for dir in work_dirs:
     if dir == work_dirs[-1]:
         # last dir (top level)
         group_file = os.path.join(results_dir, "full-mix.mp3")
+        clean = 0.1
+        reverb = 40
     else:
         group_file = os.path.join(dir + "-mix.mp3")
+        clean = 0.25
+        reverb = 0
     #print("group_file:", group_file)
     if not scan.check_for_newer(dir, group_file):
         # nothing changed, so skip processing
@@ -81,26 +85,24 @@ for dir in work_dirs:
     
     # load audio tracks, normalize, and resample at common (highest) sample rate
     audio_group = analyze.SampleGroup(dir)
-    audio_group.load()
+    audio_group.scan()
+    audio_group.load_samples()
+    
+    # generate mono version, set consistent sample rate, and filer for
+    # analysis step
+    audio_group.compute_raw()
+    audio_group.compute_onset()
+    audio_group.compute_intensities()
+    audio_group.compute_clarities()
+    audio_group.compute_envelopes()
+    audio_group.clean_noise(clean=clean, reverb=reverb)
 
     print("aup:", audio_group.aup_file)
     if args.suppress_noise or not audio_group.aup_file:
         # we need to do a full analysis if we are asked to suppress noise
         # or we need to compute sync
-
-        # generate mono version, set consistent sample rate, and filer for
-        # analysis step
-        log("Generating raw signals...")
-        audio_group.compute_raw()
-
-        # analyze audio streams (using librosa functions)
-        log("Analyzing audio tracks...")
-        audio_group.compute_onset()
-        audio_group.compute_intensities()
-        audio_group.compute_clarities()
-        if args.suppress_noise:
-            audio_group.compute_envelopes()
         # audio_group.gen_plots(audio_tracks, sync_offsets=None)
+        pass
 
     sync_offsets = []
     if not audio_group.aup_file:

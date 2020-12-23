@@ -33,7 +33,7 @@ class VideoGrid:
         num_good_videos = sum(v.reader is not None for v in videos)
         log("Number of videos to place:", num_good_videos)
         if self.cell_landscape:
-            self.num_rows = int(math.sqrt(num_good_videos / 1.5 ))
+            self.num_rows = int(math.sqrt(num_good_videos / 1.4 ))
             cols = self.num_rows
             remainder = num_good_videos - self.num_rows*self.num_rows
         else:
