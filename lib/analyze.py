@@ -7,11 +7,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 from pydub import AudioSegment, scipy_effects # pip install pydub
+from subprocess import call
 from tqdm import tqdm
 
 from .logger import log
 from . import scan
 
+sample_rate = 48000
 hop_length = 512
 
 class SampleGroup():
@@ -33,7 +35,7 @@ class SampleGroup():
         self.fadeout_list = []
         self.aup_file = None
 
-    def load(self):
+    def load_all_samples_deprecated(self):
         audio_tracks, video_tracks, aup_file = scan.scan_directory(self.path)
         log("loading audio tracks:", audio_tracks)
         self.name_list = audio_tracks
@@ -64,12 +66,84 @@ class SampleGroup():
         for i, sample in enumerate(self.sample_list):
             self.sample_list[i] = self.sample_list[i].set_frame_rate(max_frame_rate)
 
+    def check_cache(self):
+        # make cache directory (if it doesn't exist)
+        cache_dir = os.path.join(self.path, "cache")
+        if not os.path.exists(cache_dir):
+            log("Creating:", cache_dir)
+            os.makedirs(cache_dir)
+        return cache_dir
+        
+    def scan(self):
+        audio_tracks, video_tracks, aup_file = scan.scan_directory(self.path)
+        log("found audio tracks:", audio_tracks)
+        self.name_list = audio_tracks
+        self.aup_file = aup_file
+
+    def load(self, file):
+        log("loading audio track:", file)
+        basename, ext = os.path.splitext(file)
+        #print(basename, ext)
+        path = os.path.join(self.path, file)
+        if ext == ".aif":
+            ext = ".aiff"
+        try:
+            sample = AudioSegment.from_file(path, ext[1:])
+        except:
+            # create a song of silence if sample load fails
+            sample = AudioSegment.silent(duration=10000)
+        sample = sample.set_channels(2) # force samples to be stereo
+        sample = sample.set_sample_width(2) # force to 2 for this project
+        sample = sample.normalize()
+        sample = sample.set_frame_rate(sample_rate)
+        return sample
+
+    def load_samples(self):
+        cache_dir = self.check_cache()
+        
+        log("Load original samples and convert to canonical form...")
+        self.sample_list = []
+        for i, file in enumerate(self.name_list):
+            # check cache
+            fullname = os.path.join(self.path, file)
+            name = os.path.basename(file)
+            basename, ext = os.path.splitext(name)
+            canon_name = os.path.join(self.path, "cache",
+                                      basename + "-canon.mp3")
+            sample = self.load(file)
+            self.sample_list.append(sample)
+            if not self.is_newer(canon_name, fullname):
+                # save canonical version of audio in cache
+                sample.export(canon_name, format="mp3")
+        
     def compute_raw(self):
+        cache_dir = self.check_cache()
+        
+        log("Generating raw signals...")
         self.raw_list = []
-        for sample in tqdm(self.sample_list):
-            mono = sample.set_channels(1) # convert to mono
-            mono_filt = scipy_effects.band_pass_filter(mono, 130, 523) #C3-C5
-            raw = mono_filt.get_array_of_samples()
+        for i, file in enumerate(self.name_list):
+            # check cache
+            fullname = os.path.join(self.path, file)
+            name = os.path.basename(file)
+            basename, ext = os.path.splitext(name)
+            canon_name = os.path.join(self.path, "cache",
+                                      basename + "-canon.mp3")
+            mono_name = os.path.join(self.path, "cache",
+                                     basename + "-monofilt.npy")
+            if self.is_newer(mono_name, canon_name):
+                # print("loading from cache:", mono_name)
+                with open(mono_name, "rb") as f:
+                    raw = np.load(f)
+            else:
+                # compute
+                log("Generating mono/filtered sample:", mono_name)
+                sample = self.sample_list[i]
+                mono = sample.set_channels(1) # convert to mono
+                mono_filt = scipy_effects.band_pass_filter(mono, 130, 523) #C3-C5
+                raw = mono_filt.get_array_of_samples()
+                # save in cache
+                with open(mono_name, "wb") as f:
+                    np.save(f, raw)
             self.raw_list.append(raw)
             
     def compute_onset(self):
@@ -78,10 +152,10 @@ class SampleGroup():
         self.time_list = []
         for i, raw in enumerate(tqdm(self.raw_list)):
             # compute onset envelopes
-            sr = self.sample_list[i].frame_rate
             oenv = librosa.onset.onset_strength(y=np.array(raw).astype('float'),
-                                                sr=sr, hop_length=hop_length)
-            t = librosa.times_like(oenv, sr=sr, hop_length=hop_length)
+                                                sr=sample_rate,
+                                                hop_length=hop_length)
+            t = librosa.times_like(oenv, sr=sample_rate, hop_length=hop_length)
             self.onset_list.append(oenv)
             self.time_list.append(t)
             
@@ -108,12 +182,8 @@ class SampleGroup():
         return False
 
     def compute_clarities(self):
-        # make cache directory (if it doesn't exist)
-        cache_dir = os.path.join(self.path, "cache")
-        if not os.path.exists(cache_dir):
-            log("Creating:", cache_dir)
-            os.makedirs(cache_dir)
-
+        cache_dir = self.check_cache()
+        
         log("Computing clarities...")
         self.clarity_list = []
         self.chroma_list = []
@@ -131,9 +201,9 @@ class SampleGroup():
                     clarity = np.load(f)
             else:
                 # compute
-                sr = self.sample_list[i].frame_rate
                 chroma = librosa.feature.chroma_cqt(y=np.array(raw).astype('float'),
-                                                    sr=sr, hop_length=hop_length)
+                                                    sr=sample_rate,
+                                                    hop_length=hop_length)
                 self.chroma_list.append(chroma)
                 a = len(self.time_list[i])
                 b = len(self.intensity_list[i])
@@ -178,7 +248,7 @@ class SampleGroup():
                         env.append( [times[j], 0] )
                     elif active:
                         # just entered a dead spot
-                        print(" active:", active, start, end)
+                        #print(" active:", active, start, end)
                         env.append( [times[j], 1] )
                         start = j
                     active = False
@@ -190,7 +260,7 @@ class SampleGroup():
                         # just entered a live spot
                         commands.append([times[start], times[end]])
                         # shape the dead spot env
-                        print(" active:", active, start, end)
+                        #print(" active:", active, start, end)
                         if (end - start)*dt >= 0.2:
                             p1 = start + int(round(0.1/dt))
                             p2 = end - int(round(0.1/dt))
@@ -203,7 +273,7 @@ class SampleGroup():
                         start = j
                     active = True
                 end = j
-            print(" active:", active, start, end)
+            #print(" active:", active, start, end)
             if active:
                 env.append( [times[-1], 1] )
             else:
@@ -449,6 +519,71 @@ class SampleGroup():
             lead_list[i] = np.convolve(lead_list[i], box, mode='same')
             
         self.correlate_mutual(lead_list, plot=plot)
+
+    def clean_noise(self, clean=0.2, reverb=0):
+        cache_dir = self.check_cache()
+        
+        for i, sample in enumerate(self.sample_list):
+            fullname = os.path.join(self.path, self.name_list[i])
+            name = os.path.basename(self.name_list[i])
+            basename, ext = os.path.splitext(name)
+            canon_name = os.path.join(self.path, "cache",
+                                      basename + "-canon.mp3")
+            noise_name = os.path.join(self.path, "cache",
+                                      basename + "-noise.mp3")
+            noiseprof_name = os.path.join(self.path, "cache",
+                                         basename + ".noiseprof")
+            clean_name = os.path.join(self.path, "cache",
+                                      basename + "-clean.mp3")
+            if not self.is_newer(noise_name, canon_name):
+                new_sample = None
+                commands = self.suppress_list[i]
+                if len(commands):
+                    print("commands:", commands)
+                    blend = 100     # ms
+                    seg = None
+                    start = 0
+                    for cmd in commands:
+                        print("command:", cmd)
+                        (t0, t1) = cmd
+                        ms0 = int(round(t0*1000))
+                        ms1 = int(round(t1*1000))
+                        print("  start:", start, "range:", ms0, ms1)
+                        if (ms1 - ms0) < 2*blend:
+                            # too short to deal with
+                            continue
+                        print("noise:", ms0, ms1)
+                        noise = sample[ms0:ms1]
+                        if new_sample is None:
+                            new_sample = noise
+                        else:
+                            new_sample.append(noise, crossfade=blend)
+                if not new_sample is None:
+                    # generate noise sample
+                    new_sample.export(noise_name, format="mp3")
+            if os.path.exists(noise_name):
+                if not self.is_newer(noiseprof_name, noise_name):
+                    # generate noise profile
+                    command = [ "sox", noise_name, "-n", "noiseprof",
+                                noiseprof_name ]
+                    log("command:", command)
+                    result = call(command)
+                    log("sox result code:", result)
+            if os.path.exists(noiseprof_name):
+                # generate cleaned up version of audio
+                if not self.is_newer(clean_name, noiseprof_name):
+                    command = [ "sox", canon_name, clean_name, "noisered",
+                                noiseprof_name, "%0.2f" % clean ]
+                    if reverb > 0:
+                        command += [ "reverb", "%d" % reverb, "50", "75" ]
+                    log("command:", command)
+                    result = call(command)
+                    log("sox result code:", result)
+                else:
+                    print(clean_name, "is newer than", noise_name)
+            else:
+                log("No noise profile, using original sample as the cleaned version:", clean_name)
+                sample.export(clean_name, format="mp3")
                 
     # visualize audio streams (using librosa functions)
     def gen_plots(self, names, sync_offsets=None):
@@ -457,12 +592,11 @@ class SampleGroup():
         fig, ax = plt.subplots(nrows=len(self.raw_list),
                                sharex=True, sharey=True)
         for i in range(len(self.raw_list)):
-            sr = self.sample_list[i].frame_rate
             if sync_offsets is None:
                 trimval = 0
             else:
-                trimval = int(round(sync_offsets[i] * sr / 1000))
-            librosa.display.waveplot(np.array(self.raw_list[i][trimval:]).astype('float'), sr=sr, ax=ax[i])
+                trimval = int(round(sync_offsets[i] * sample_rate / 1000))
+            librosa.display.waveplot(np.array(self.raw_list[i][trimval:]).astype('float'), sr=sample_rate, ax=ax[i])
             ax[i].set(title=names[i])
             ax[i].label_outer()
             if ( len(self.beat_list) ):
@@ -498,11 +632,10 @@ class SampleGroup():
                                    sharex=True, sharey=True)
             for i in range(len(self.raw_list)):
                 print(" ", names[i])
-                sr = self.sample_list[i].frame_rate
                 if sync_offsets is None:
                     trimval = 0
                 else:
-                    trimval = int(round(sync_offsets[i] * sr / 1000))
+                    trimval = int(round(sync_offsets[i] * sample_rate / 1000))
                 img = librosa.display.specshow(self.chroma_list[i],
                                                x_axis='time',
                                                y_axis='chroma',
