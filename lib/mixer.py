@@ -7,7 +7,7 @@ import random
 from .logger import log
 
 def combine(group, sync_offsets, mute_tracks,
-            hints={}, pan_range=0, suppress_list=None):
+            hints={}, pan_range=0, suppress_silent_zones=False):
     durations_ms = []
     for i, sample in enumerate(group.sample_list):
         # print(group.name_list[i], len(sample) / 1000, sync_offsets[i])
@@ -15,9 +15,16 @@ def combine(group, sync_offsets, mute_tracks,
     duration_ms = np.median(durations_ms)
     log("median audio duration (sec):", duration_ms / 1000)
 
-    if not suppress_list is None:
-        log("NOTICE: performing noise surpression on individual tracks.")
-        
+    if suppress_silent_zones:
+        if not group.suppress_list is None:
+            log("NOTICE: performing noise supression on individual tracks.")
+        else:
+            log("NOTICE: no silent zones defined for this group, cannot suppress them.")
+    else:
+        log("NOTICE: not suppressing silent zones in top level tracks by design.")
+
+    log("temp mute tracks:", mute_tracks)
+    
     # auto mute reference tracks, but include accompaniment
     for name in group.name_list:
         print("checking:", name)
@@ -68,8 +75,8 @@ def combine(group, sync_offsets, mute_tracks,
         if pan_range > 0.00001 and pan_range <= 1.0:
             sample = sample.pan( random.uniform(-pan_range, pan_range) )
         commands = []
-        if not suppress_list is None:
-            commands = suppress_list[i]
+        if not group.suppress_list is None:
+            commands = group.suppress_list[i]
         # add hints (offset relative to track 0) to suppress list
         if basename in hints and "suppress" in hints[basename]:
             offset_sec = sync_offset/1000
@@ -78,7 +85,7 @@ def combine(group, sync_offsets, mute_tracks,
                 print(cmd)
                 commands.append( (cmd[0]+offset_sec, cmd[1]+offset_sec) )
         sample = sample.fade_in(1000)
-        if False and len(commands):
+        if suppress_silent_zones and len(commands):
             # temporarily skip non-music suppression
             print("commands:", commands)
             blend = 300         # ms
@@ -86,16 +93,16 @@ def combine(group, sync_offsets, mute_tracks,
             start = 0
             new_sample = None
             for cmd in commands:
-                print("command:", cmd)
+                #print("command:", cmd)
                 (t0, t1) = cmd
                 ms0 = int(round(t0*1000))
                 ms1 = int(round(t1*1000))
-                print("  start:", start, "range:", ms0, ms1)
-                if ms1 - ms0 < 2*blend:
+                #print("  start:", start, "range:", ms0, ms1)
+                if ms1 - ms0 < 2*blend + 1:
                     # too short to deal with
                     continue
                 begin = sample[:ms0+blend]
-                print("silent:", ms0, ms1)
+                #print("silent:", ms0, ms1)
                 silent = AudioSegment.silent(duration=ms1-ms0)
                 end = sample[ms1-blend:]
                 new_sample = begin.append(silent, crossfade=blend)
