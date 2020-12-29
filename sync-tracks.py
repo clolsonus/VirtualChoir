@@ -74,10 +74,12 @@ for dir in work_dirs:
         group_file = os.path.join(results_dir, "full-mix.mp3")
         clean = 0.1
         reverb = 40
+        suppress_silent_zones = False
     else:
         group_file = os.path.join(dir + "-mix.mp3")
         clean = 0.25
         reverb = 0
+        suppress_silent_zones = True
     #print("group_file:", group_file)
     if not scan.check_for_newer(dir, group_file):
         # nothing changed, so skip processing
@@ -146,12 +148,12 @@ for dir in work_dirs:
 
     if args.mute_videos:
         log("Reqeust to mute the audio channels on videos: lip sync mode.")
-        mute_tracks = all_video_tracks
+        mute_tracks = audio_group.video_list
     else:
         mute_tracks = []
     mixed = mixer.combine(audio_group, sync_offsets,
                           mute_tracks, hints=hint_dict, pan_range=0.3,
-                          suppress_list=audio_group.suppress_list)
+                          suppress_silent_zones=suppress_silent_zones)
     log("Mixed audio file:", group_file)
     mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
 
