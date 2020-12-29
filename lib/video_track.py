@@ -51,9 +51,12 @@ class VideoTrack:
         self.w = int(metadata['video']['@width'])
         self.h = int(metadata['video']['@height'])
         if '@sample_aspect_ratio' in metadata['video']:
-            dw, _ = metadata['video']['@sample_aspect_ratio'].split(':')
-            if int(dw) > self.w:
-                self.displayw = int(dw)
+            num, den = metadata['video']['@sample_aspect_ratio'].split(':')
+            if int(den) > 0:
+                width_mul = int(num) / int(den)
+            else:
+                width_mul = 1
+            self.displayw = int(round(self.w * width_mul))
             self.w = self.displayw
         if '@duration' in metadata['video']:
             self.duration = float(metadata['video']['@duration'])

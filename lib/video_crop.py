@@ -5,26 +5,26 @@ import numpy as np
 def get_fit(frame, scale_w, scale_h):
     if scale_w < scale_h:
         result = cv2.resize(frame, None, fx=scale_w, fy=scale_w,
-                            interpolation=cv2.INTER_CUBIC)
+                            interpolation=cv2.INTER_AREA)
     else:
         result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
-                            interpolation=cv2.INTER_CUBIC)
+                            interpolation=cv2.INTER_AREA)
     return result
 
 # return a scaled version of the frame that stretches vertically and
 # is cropped (if needed) horizontally
 def get_fit_height(frame, scale_h):
     result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
-                        interpolation=cv2.INTER_CUBIC)
+                        interpolation=cv2.INTER_AREA)
     return result
 
 def get_zoom(frame, scale_w, scale_h):
     if scale_w < scale_h:
         result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
-                            interpolation=cv2.INTER_CUBIC)
+                            interpolation=cv2.INTER_AREA)
     else:
         result = cv2.resize(frame, None, fx=scale_w, fy=scale_w,
-                            interpolation=cv2.INTER_CUBIC)
+                            interpolation=cv2.INTER_AREA)
     return result
         
 def clip_frame(frame, cell_w, cell_h):
@@ -56,10 +56,9 @@ def fit_face(v):
     if v.face.count > 0 and not v.local_time is None:
         (l, r, t, b) = v.face.get_face(v.local_time, 1.0)
     else:
+        (b, r) = v.raw_frame.shape[:2]
         l = 0
-        r = framew
         t = 0
-        b = frameh
     face_area = (r - l) * (b - t)
     cell_area = v.size_w * v.size_h
     if face_area < 2 * cell_area:
@@ -67,7 +66,7 @@ def fit_face(v):
         # then back down)
         scale = 2.0
         superscale = cv2.resize(v.raw_frame, None, fx=scale, fy=scale,
-                                interpolation=cv2.INTER_CUBIC)
+                                interpolation=cv2.INTER_AREA)
         l = l * scale
         r = r * scale
         t = t * scale
