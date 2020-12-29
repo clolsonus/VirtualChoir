@@ -20,6 +20,7 @@ class SampleGroup():
     def __init__(self, path):
         self.path = path
         self.name_list = []
+        self.video_list = []
         self.sample_list = []
         self.raw_list = []
         self.onset_list = []
@@ -78,6 +79,7 @@ class SampleGroup():
         audio_tracks, video_tracks, aup_file = scan.scan_directory(self.path)
         log("found audio tracks:", audio_tracks)
         self.name_list = audio_tracks
+        self.video_list = video_tracks
         self.aup_file = aup_file
 
     def load(self, file):
@@ -87,11 +89,16 @@ class SampleGroup():
         path = os.path.join(self.path, file)
         if ext == ".aif":
             ext = ".aiff"
+        elif ext == ".mpeg" or ext == ".m4v":
+            ext = ".mp4"
         try:
             sample = AudioSegment.from_file(path, ext[1:])
         except:
             # create a song of silence if sample load fails
+            log("NOTICE: loading audio failed for:", file)
             sample = AudioSegment.silent(duration=10000)
+        # generic band pass filter to knock off the extreme artifacts
+        # /*goes bad later*/ sample = scipy_effects.band_pass_filter(sample, 50, 4500)
         sample = sample.set_channels(2) # force samples to be stereo
         sample = sample.set_sample_width(2) # force to 2 for this project
         sample = sample.normalize()
@@ -283,7 +290,7 @@ class SampleGroup():
                 env.append( [times[-1], 0] )
             #print(env)
             self.envelope_list.append(env)
-            print(commands)
+            #print(commands)
             self.suppress_list.append(commands)
             
     def compute_margins(self):
@@ -535,24 +542,25 @@ class SampleGroup():
                                          basename + ".noiseprof")
             clean_name = os.path.join(self.path, "cache",
                                       basename + "-clean.mp3")
+            log("Generating noise profile for:", name)
             if not self.is_newer(noise_name, canon_name):
                 new_sample = None
                 commands = self.suppress_list[i]
                 if len(commands):
-                    print("commands:", commands)
+                    #print("commands:", commands)
                     blend = 100     # ms
                     seg = None
                     start = 0
                     for cmd in commands:
-                        print("command:", cmd)
+                        #print("command:", cmd)
                         (t0, t1) = cmd
                         ms0 = int(round(t0*1000))
                         ms1 = int(round(t1*1000))
-                        print("  start:", start, "range:", ms0, ms1)
+                        #print("  start:", start, "range:", ms0, ms1)
                         if (ms1 - ms0) < 2*blend:
                             # too short to deal with
                             continue
-                        print("noise:", ms0, ms1)
+                        #print("noise:", ms0, ms1)
                         noise = sample[ms0:ms1]
                         if new_sample is None:
                             new_sample = noise
