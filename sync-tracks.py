@@ -190,7 +190,7 @@ if len(all_video_tracks) and not args.no_video:
     if args.write_aligned_tracks:
         log("Generating trimmed/padded tracks that start at a common aligned time.")
         video.save_aligned(args.project, results_dir, all_video_tracks,
-                           sync_offsets)
+                           video_offsets)
     
 else:
     log("No video tracks, or audio-only requested.")
