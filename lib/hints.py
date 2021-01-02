@@ -8,7 +8,7 @@ def load(path):
     hints = {}
     if os.path.exists(hints_file):
         log("Found a hints.txt file, loading...")
-        with open(hints_file, 'r') as fp:
+        with open(hints_file, 'r', encoding="utf-16") as fp:
             reader = csv.reader(fp, delimiter=' ', skipinitialspace=True)
             for row in reader:
                 print("|".join(row))
