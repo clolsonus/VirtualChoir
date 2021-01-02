@@ -56,8 +56,9 @@ class VideoTrack:
                 width_mul = int(num) / int(den)
             else:
                 width_mul = 1
-            self.displayw = int(round(self.w * width_mul))
-            self.w = self.displayw
+            if width_mul < 0.8 or width_mul > 1.2:
+                self.displayw = int(round(self.w * width_mul))
+                self.w = self.displayw
         if '@duration' in metadata['video']:
             self.duration = float(metadata['video']['@duration'])
         else:
@@ -98,8 +99,8 @@ class VideoTrack:
                 #else:
             except:
                 self.frame = None
-                
         if self.frame is not None:
+            #cv2.imshow("before", self.frame)
             if rotate == 0:
                 self.raw_frame = self.frame
             elif rotate == 90:
@@ -112,6 +113,7 @@ class VideoTrack:
                 self.raw_frame = cv2.flip(tmp, 0)
             else:
                 print("unhandled rotation angle:", rotate)
+            #cv2.imshow("after", self.raw_frame)
         else:
             # no more frames, impliment a simple fade out
             if self.raw_frame is not None:
