@@ -157,13 +157,15 @@ class FaceDetect():
             self.data_append(time, l, r, t, b, scale)
         else:
             self.miss += 1
-            return None
+            #return None
 
         self.update_interp()
         result = self.get_face(time, scale)
         if not result is None:
             (l, r, t, b) = result
-            frame = cv2.rectangle(np.array(frame), (int(l), int(t)), (int(r), int(b)), (255,255,255), 2)
+        else:
+            (l, r, t, b) = (0, frame.shape[1], 0, frame.shape[0])
+        frame = cv2.rectangle(np.array(frame), (int(l), int(t)), (int(r), int(b)), (255,255,255), 2)
         
         cv2.imshow('face detection', frame)
         cv2.waitKey(1)
