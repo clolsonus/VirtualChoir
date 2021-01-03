@@ -37,16 +37,27 @@ class VideoTrack:
         # sanity check fps
         use_backup_fps = False
         name, ext = os.path.splitext(file)
+        # catch bogus frame per second attributes
         if ext[1:] == "webm" and (self.fps < 1 or self.fps > 1000):
             use_backup_fps = True
-        elif self.fps < 1 or self.fps > 120:
+        if self.fps < 1 or self.fps > 240:
             use_backup_fps = True
-        if use_backup_fps:
-            # something crazy happened let's try something else
-            fps_string = metadata['video']['@avg_frame_rate']
-            (num, den) = fps_string.split('/')
-            if float(den) > 0:
-                self.fps = float(num) / float(den)
+        # get avg fps
+        fps_string = metadata['video']['@avg_frame_rate']
+        (num, den) = fps_string.split('/')
+        if float(den) > 0:
+            avg_fps = float(num) / float(den)
+        else:
+            avg_fps = 0
+        # check for consensus with reported frame rate
+        if avg_fps > 0:
+            ratio = self.fps / avg_fps
+            if ratio < 0.9 or ratio > 1.1:
+                # disagreement with self reported fps
+                use_backup_fps = True
+        if avg_fps > 0 and use_backup_fps:
+            # something crazy happened let's try the average fps
+            self.fps = avg_fps
         codec = metadata['video']['@codec_long_name']
         self.w = int(metadata['video']['@width'])
         self.h = int(metadata['video']['@height'])
