@@ -4,7 +4,7 @@ from random import randrange
 from .logger import log
 
 class VideoGrid:
-    def __init__(self, videos, output_w, output_h, border):
+    def __init__(self, videos, output_w, output_h, border, rows):
         log("Setting up the video grid:")
         self.output_w = output_w
         self.output_h = output_h
@@ -32,7 +32,12 @@ class VideoGrid:
 
         num_good_videos = sum(v.reader is not None for v in videos)
         log("Number of videos to place:", num_good_videos)
-        if self.cell_landscape:
+        if not rows is None:
+            # we have a number of rows request to honor
+            self.num_rows = rows
+            cols = 1
+            remainder = num_good_videos - self.num_rows * cols
+        elif self.cell_landscape:
             self.num_rows = int(math.sqrt(num_good_videos / 1.4 ))
             cols = self.num_rows
             remainder = num_good_videos - self.num_rows*self.num_rows
