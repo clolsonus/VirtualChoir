@@ -24,13 +24,13 @@ parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
                     help='sync strategy')
 parser.add_argument('--reference', help='file name of declared refrence track')
 parser.add_argument('--suppress-noise', action='store_true', help='try to suppress extraneous noises.')
+parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
 parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
+parser.add_argument('--no-video', action='store_true', help='skip the video production.')
 parser.add_argument('--resolution', default='1080p',
                     choices=['480p', '720p', '1080p', '1440p'],
                     help='video output resolution')
-parser.add_argument('--no-video', action='store_true', help='skip the video production.')
-parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
-
+parser.add_argument('--rows', type=int, help='request specific number of video rows')
 args = parser.parse_args()
 
 log("Begin processing job", fancy=True)
@@ -180,17 +180,18 @@ if len(all_video_tracks) and not args.no_video:
             log("No offset found for:", track)
         print(track, offset)
         video_offsets.append(offset)
-    # render the new combined video
-    video.render_combined_video( args.project, args.resolution, results_dir,
-                                 all_video_tracks, video_offsets,
-                                 hints=hint_dict,
-                                 title_page=title_page,
-                                 credits_page=credits_page )
-    video.merge( args.project, results_dir )
     if args.write_aligned_tracks:
         log("Generating trimmed/padded tracks that start at a common aligned time.")
         video.save_aligned(args.project, results_dir, all_video_tracks,
                            video_offsets)
+    # render the new combined video
+    video.render_combined_video( args.project, args.resolution, results_dir,
+                                 all_video_tracks, video_offsets,
+                                 hints=hint_dict,
+                                 rows=args.rows,
+                                 title_page=title_page,
+                                 credits_page=credits_page )
+    video.merge( args.project, results_dir )
     
 else:
     log("No video tracks, or audio-only requested.")
