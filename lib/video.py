@@ -42,7 +42,7 @@ def gen_dicts(fps, quality="sane"):
 # fixme: figure out why zooming on some landscape videos in some cases
 #        doesn't always fill the grid cell (see Coeur, individual grades.) 
 def render_combined_video(project, resolution, results_dir,
-                          video_names, offsets, hints={},
+                          video_names, offsets, hints={}, rows=None, fit='face',
                           title_page=None, credits_page=None):
     if resolution == '480p':
         output_w = 854
@@ -140,7 +140,7 @@ def render_combined_video(project, resolution, results_dir,
         return
 
     # plan and setup the grid
-    grid = VideoGrid(videos, output_w, output_h, border)
+    grid = VideoGrid(videos, output_w, output_h, border, rows)
     #spiral = VideoSpiral(videos, output_w, output_h, border)
     
     # open writer for output
@@ -172,7 +172,7 @@ def render_combined_video(project, resolution, results_dir,
         # compute placement/size for each video frame (static grid strategy)
         grid.update(videos, output_time)
         #spiral.update(videos, output_time)
-                
+
         # scale/fit each frame to it's cell size
         for i in range(len(videos)):
             v = videos[i]
@@ -186,13 +186,10 @@ def render_combined_video(project, resolution, results_dir,
                 scale_w = v.size_w / w
                 scale_h = v.size_h / h
                 
-                #option = "fit"
-                #option = "zoom"
-                option = "face"
                 background = None
-                if option == "fit":
+                if fit == "fit":
                     v.shaped_frame = video_crop.get_fit(frame, scale_w, scale_h)
-                elif option == "zoom":
+                elif fit == "zoom":
                     if grid.cell_landscape != vid_landscape:
                         # background/wings full zoom
                         background = video_crop.get_zoom(frame, scale_w, scale_h)
@@ -211,7 +208,7 @@ def render_combined_video(project, resolution, results_dir,
                         v.shaped_frame = frame_scale
                     else:
                         v.shaped_frame = video_crop.overlay_frames(background, frame_scale)
-                elif option == "face":
+                elif fit == "face":
                     basename = os.path.basename(video_names[i])
                     if basename in hints and "face_detect" in hints[basename]:
                         use_face = (hints[basename]["face_detect"] > 0.01)
@@ -330,15 +327,16 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
             
     log("Writing aligned version of videos...", fancy=True)
     for i, video in enumerate(video_names):
+        print(video, sync_offsets[i])
         video_file = os.path.join(project, video)
         # decide trim/pad
-        sync_ms = sync_offsets[i]
-        if sync_ms >= 0:
-            trim_sec = sync_ms / 1000
+        sync_ms = sync_offsets[i] * 1000
+        if sync_offsets[i] < 0:
+            trim_sec = -sync_offsets[i]
             pad_sec = 0
         else:
             trim_sec = 0
-            pad_sec = -sync_ms / 1000
+            pad_sec = sync_offsets[i]
         
         # scan video meta data for resolution/fps
         metadata = skvideo.io.ffprobe(video_file)
@@ -368,7 +366,7 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
         tmp_video = os.path.join(results_dir, "tmp_video.mp4")
         tmp_audio = os.path.join(results_dir, "tmp_audio.mp3")
         output_file = os.path.join(results_dir, "aligned_video_" + name + ".mp4")
-        log("aligned_video_" + name + ".mp4", "offset(sec):", sync_ms/1000)
+        log("aligned_video_" + name + ".mp4", "offset(sec):", sync_offsets[i])
         log("  fps:", fps, "codec:", codec, "size:", w, "x", h, "total frames:", total_frames)
 
         # open source
@@ -388,7 +386,7 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
         if trim_sec > 0:
             trim_frames = int(round(fps*trim_sec))
             log("  trim (sec):", trim_sec, "frames:", trim_frames)
-            for i in range(trim_frames):
+            for j in range(trim_frames):
                 reader._readFrame() # discard
 
         # copy remainder of video
@@ -426,10 +424,10 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
         # load the audio (ignoring we already have it loaded somewhere else)
         basename, ext = os.path.splitext(video_file)
         sample = AudioSegment.from_file(video_file, ext[1:])
-        if sync_ms >= 0:
-            synced_sample = sample[sync_ms:]
+        if sync_ms < 0:
+            synced_sample = sample[-sync_ms:]
         else:
-            pad = AudioSegment.silent(duration=-sync_ms)
+            pad = AudioSegment.silent(duration=sync_ms)
             synced_sample = pad + sample
         synced_sample.export(tmp_audio, format="mp3")
         
