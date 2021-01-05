@@ -137,16 +137,43 @@ def run_job(settings, request):
     if len(request['Additional Options']):
         options = request['Additional Options'].split(", ")
         for o in options:
-            if o.lower().startswith("only audio"):
-                audio_only = True
-                command.append("--no-video")
-            elif o.lower().startswith("suppress noise"):
+            if o.lower().startswith("suppress noise"):
                 command.append("--suppress-noise")
-            elif o.lower().startswith("mute videos"):
-                command.append("--mute-videos")
             elif o.lower().startswith("make individual time aligned tracks"):
                 aligned_tracks = True
                 command.append("--write-aligned-tracks")
+    if len(request['Video Options']):
+        options = request['Video Options'].split(", ")
+        for o in options:
+            if o.lower().startswith("No Video"):
+                audio_only = True
+                command.append("--no-video")
+            elif o.lower().startswith("mute videos"):
+                command.append("--mute-videos")
+    if len(request['Video Resolution']):
+        if request['Video Resolution'].startswith("720p"):
+            command.append("--resolution")
+            command.append("720p")
+        elif request['Video Resolution'].startswith("1080p"):
+            command.append("--resolution")
+            command.append("1080p")
+        elif request['Video Resolution'].startswith("1440p"):
+            command.append("--resolution")
+            command.append("1440p")
+    if len(request["Specify Number of Video Rows"]):
+        command.append("--rows")
+        command.append(str(int(request["Specify Number of Video Rows"])))
+    if len(request["Crop/Zoom Strategy"]):
+        if request["Crop/Zoom Strategy"].startswith("Find Faces"):
+            command.append("--crop")
+            command.append("face")
+        elif request["Crop/Zoom Strategy"].startswith("Best fit"):
+            command.append("--crop")
+            command.append("fit")
+        elif request["Crop/Zoom Strategy"].startswith("None"):
+            command.append("--crop")
+            command.append("none")
+ 
     print("Running command:", command)
     result = subprocess.run(command)
     if result.returncode != 0:

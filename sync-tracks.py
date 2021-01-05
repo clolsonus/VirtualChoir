@@ -31,7 +31,7 @@ parser.add_argument('--resolution', default='1080p',
                     choices=['480p', '720p', '1080p', '1440p'],
                     help='video output resolution')
 parser.add_argument('--rows', type=int, help='request specific number of video rows')
-parser.add_argument('--fit', default='face', choices=['fit', 'zoom', 'face'],
+parser.add_argument('--crop', default='face', choices=['face', 'fit', 'none'],
                     help='video scaling/cropping strategy')
 args = parser.parse_args()
 
@@ -189,7 +189,8 @@ if len(all_video_tracks) and not args.no_video:
     # render the new combined video
     video.render_combined_video( args.project, args.resolution, results_dir,
                                  all_video_tracks, video_offsets,
-                                 hints=hint_dict, rows=args.rows, fit=args.fit,
+                                 hints=hint_dict, rows=args.rows,
+                                 crop=args.crop,
                                  title_page=title_page,
                                  credits_page=credits_page )
     video.merge( args.project, results_dir )

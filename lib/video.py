@@ -42,7 +42,8 @@ def gen_dicts(fps, quality="sane"):
 # fixme: figure out why zooming on some landscape videos in some cases
 #        doesn't always fill the grid cell (see Coeur, individual grades.) 
 def render_combined_video(project, resolution, results_dir,
-                          video_names, offsets, hints={}, rows=None, fit='face',
+                          video_names, offsets, hints={}, rows=None,
+                          crop='face',
                           title_page=None, credits_page=None):
     if resolution == '480p':
         output_w = 854
@@ -187,9 +188,9 @@ def render_combined_video(project, resolution, results_dir,
                 scale_h = v.size_h / h
                 
                 background = None
-                if fit == "fit":
+                if crop == "none":
                     v.shaped_frame = video_crop.get_fit(frame, scale_w, scale_h)
-                elif fit == "zoom":
+                elif crop == "fit":
                     if grid.cell_landscape != vid_landscape:
                         # background/wings full zoom
                         background = video_crop.get_zoom(frame, scale_w, scale_h)
@@ -208,7 +209,7 @@ def render_combined_video(project, resolution, results_dir,
                         v.shaped_frame = frame_scale
                     else:
                         v.shaped_frame = video_crop.overlay_frames(background, frame_scale)
-                elif fit == "face":
+                elif crop == "face":
                     basename = os.path.basename(video_names[i])
                     if basename in hints and "face_detect" in hints[basename]:
                         use_face = (hints[basename]["face_detect"] > 0.01)
