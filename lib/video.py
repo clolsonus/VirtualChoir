@@ -398,15 +398,27 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
                 if not len(frame):
                     frame = None
                 else:
-                    # small bit of down scaling while maintaining
-                    # original aspect ratio
-                    target_area = 1280*720
-                    area = frame.shape[0] * frame.shape[1]
-                    #print("area:", area, "target_area:", target_area)
-                    if area > target_area:
-                        scale = math.sqrt( target_area / area )
-                        frame = cv2.resize(frame, None, fx=scale, fy=scale,
-                                           interpolation=cv2.INTER_AREA)
+                    (h, w) = frame.shape[:2]
+                    vid_aspect = w/h
+                    vid_landscape = (vid_aspect >= 1)
+                    scale_w = 1280 / w
+                    scale_h = 720 / h
+                    background = None
+                    if not vid_landscape:
+                        # background/wings full zoom
+                        background = video_crop.get_zoom(frame, scale_w, scale_h)
+                        background = cv2.blur(background, (43, 43))
+                        background = video_crop.clip_frame(background,
+                                                           1280, 720)
+                        # foreground compromise zoom/fit/arrangement
+                        avg = (scale_w + scale_h) * 0.5
+                        scale_w = avg
+                        scale_h = avg
+                        #print("scale:", scale_w, scale_h)
+                    frame = video_crop.get_zoom(frame, scale_w, scale_h)
+                    frame = video_crop.clip_frame(frame, 1280, 720)
+                    if background:
+                        frame = video_crop.overlay_frames(background, frame)
             except:
                 frame = None
             if frame is None:
