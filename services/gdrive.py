@@ -203,8 +203,13 @@ class gdrive():
                 downloader = MediaIoBaseDownload(fh, request)
                 done = False
                 while done is False:
-                    status, done = downloader.next_chunk()
-                    print("  Download %d%%." % int(status.progress() * 100))
+                    try:
+                        status, done = downloader.next_chunk()
+                        print("  Download %d%%." % int(status.progress() * 100))
+                    except Exception as e:
+                        print("Error downloading chunk:", str(e))
+                        print("Sleeping 15 seconds and trying again")
+                        time.sleep(15)
                 print("  downloaded bytes:", len(fh.getvalue()))
                 with open(dest_file, 'wb') as f:
                     f.write(fh.getvalue())
