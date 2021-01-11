@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 #from pydub import AudioSegment, playback, scipy_effects  # pip install pydub
+from subprocess import call
 from tqdm import tqdm
 
 from lib import analyze
@@ -75,12 +76,10 @@ for dir in work_dirs:
         # last dir (top level)
         group_file = os.path.join(results_dir, "full-mix.mp3")
         clean = 0.1
-        reverb = 40
         suppress_silent_zones = False
     else:
         group_file = os.path.join(dir + "-mix.mp3")
-        clean = 0.25
-        reverb = 0
+        clean = 0.20
         suppress_silent_zones = True
     #print("group_file:", group_file)
     if not scan.check_for_newer(dir, group_file):
@@ -99,7 +98,7 @@ for dir in work_dirs:
     audio_group.compute_intensities()
     audio_group.compute_clarities()
     audio_group.compute_envelopes()
-    audio_group.clean_noise(clean=clean, reverb=reverb)
+    audio_group.clean_noise(clean=clean)
 
     print("aup:", audio_group.aup_file)
     if args.suppress_noise or not audio_group.aup_file:
@@ -157,7 +156,24 @@ for dir in work_dirs:
                           mute_tracks, hints=hint_dict, pan_range=0.3,
                           suppress_silent_zones=suppress_silent_zones)
     log("Mixed audio file:", group_file)
-    mixed.export(group_file, format="mp3", tags={'artist': 'Various artists', 'album': 'Best of 2011', 'comments': 'This album is awesome!'})
+    
+    if dir == work_dirs[-1]:
+        # top level final mix, write a temp file, then add reverb with sox
+        reverb = 50
+        mixed.export(group_file + "-tmp.mp3", format="mp3",
+                     tags={'artist': 'Various', 'album': 'Virtual Choir Maker',
+                           'comments': 'https://virtualchoir.flightgear.org'})
+        command = [ "sox", group_file + "-tmp.mp3", group_file,
+                    "reverb", "%d" % reverb, "50", "75" ]
+        log("command:", command)
+        result = call(command)
+        log("sox result code:", result)
+        os.unlink(group_file + "-tmp.mp3")
+    else:
+        # sub group mix
+        mixed.export(group_file, format="mp3",
+                     tags={'artist': 'Various', 'album': 'Virtual Choir Maker',
+                           'comments': 'https://virtualchoir.flightgear.org'})
 
     if args.write_aligned_tracks:
         log("Generating trimmed/padded tracks that start at a common aligned time.")
