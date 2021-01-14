@@ -79,7 +79,7 @@ for dir in work_dirs:
         suppress_silent_zones = False
     else:
         group_file = os.path.join(dir + "-mix.mp3")
-        clean = 0.20
+        clean = 0.25
         suppress_silent_zones = True
     #print("group_file:", group_file)
     if not scan.check_for_newer(dir, group_file):
