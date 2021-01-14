@@ -3,6 +3,8 @@ from random import randrange
 
 from .logger import log
 
+concert_entrance = False
+
 class VideoGrid:
     def __init__(self, videos, output_w, output_h, border, rows):
         log("Setting up the video grid:")
@@ -10,7 +12,6 @@ class VideoGrid:
         self.output_h = output_h
         self.border = border
         self.place_count = 0
-        self.odd_offset = 0
         self.even_offset = self.output_w
         self.last_placed_row = 0
         num_portrait = 0
@@ -88,8 +89,6 @@ class VideoGrid:
         # compute placement/size for each frame (static grid strategy)
         row = 0
         col = 0
-        if self.odd_offset >= 0:
-            self.odd_offset = 0
         if self.even_offset < self.output_w:
             self.even_offset = self.output_w
         max_step = self.output_w * 0.008
@@ -110,42 +109,39 @@ class VideoGrid:
             cols = row_info["cols"]
             cell_w = row_info["cell_w"]
             cell_h = row_info["cell_h"]
-            if True or v.raw_frame is not None:
-                # target grid location
-                x = self.border + col * (cell_w + self.border)
-                y = self.border + row * (cell_h + self.border)
-                if v.place_x is None or v.place_y is None:
-                    self.place_count += 1
-                    v.sort_order = self.place_count
-                    if row > self.last_placed_row:
-                        self.last_placed_row = row
-                        self.even_offset = self.output_w + randrange(int(cell_w))
+            # target grid location
+            x = self.border + col * (cell_w + self.border)
+            y = self.border + row * (cell_h + self.border)
+            if v.place_x is None or v.place_y is None:
+                self.place_count += 1
+                v.sort_order = self.place_count
+                if row > self.last_placed_row:
+                    self.last_placed_row = row
+                    self.even_offset = self.output_w + randrange(int(cell_w))
+                if concert_entrance:
                     if v.place_x is None:
-                        if True or row % 2 == 0:
-                            v.place_x = self.even_offset
-                            self.even_offset += (cell_w + self.border)
-                        else:
-                            self.odd_offset -= cell_w
-                            v.place_x = self.odd_offset
-                            self.odd_offset -= self.border
+                        v.place_x = self.even_offset
+                        self.even_offset += (cell_w + self.border)
                     if v.place_y is None:
                         v.place_y = y
                 else:
-                    dx = (x - v.place_x) * 0.2
-                    dy = (y - v.place_y) * 0.2
-                    if dx > max_step: dx = max_step
-                    if dx < -max_step: dx = -max_step
-                    if dy > max_step: dy = max_step
-                    if dy < -max_step: dy = -max_step
-                    v.place_x += dx
-                    v.place_y += dy
-                v.size_w = cell_w
-                v.size_h = cell_h
-                col += 1
-                if col >= cols:
-                    col = 0
-                    row += 1
+                    v.place_x = x
+                    v.place_y = y
+            else:
+                dx = (x - v.place_x) * 0.2
+                dy = (y - v.place_y) * 0.2
+                if dx > max_step: dx = max_step
+                if dx < -max_step: dx = -max_step
+                if dy > max_step: dy = max_step
+                if dy < -max_step: dy = -max_step
+                v.place_x += dx
+                v.place_y += dy
+            v.size_w = cell_w
+            v.size_h = cell_h
+            col += 1
+            if col >= cols:
+                col = 0
+                row += 1
 
         # outside videos loop!
-        self.odd_offset += max_step
         self.even_offset -= max_step
