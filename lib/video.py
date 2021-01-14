@@ -126,6 +126,13 @@ def render_combined_video(project, resolution, results_dir,
             if not faces is None and basename in faces:
                 v.face.data = faces[basename]
                 v.face.update_interp()
+            # hack to use faces data to fix duration on webm videos
+            # that don't self report
+            if v.duration <= 1 and not faces is None and basename in faces:
+                v.duration = v.face.data[-1]["time"]
+                v.total_frames = int(round(v.duration * v.fps))
+                print("Updated video duration:", v.duration)
+                durations[-1] = v.duration + offsets[i]
         videos.append(v)
         # else:
         #     # don't render but we still need a placeholder so videos
