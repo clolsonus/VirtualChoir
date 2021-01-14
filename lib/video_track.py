@@ -40,7 +40,7 @@ class VideoTrack:
         # catch bogus frame per second attributes
         if ext[1:] == "webm" and (self.fps < 1 or self.fps > 1000):
             use_backup_fps = True
-        if self.fps < 1 or self.fps > 240:
+        elif self.fps < 1 or self.fps > 240:
             use_backup_fps = True
         # get avg fps
         fps_string = metadata['video']['@avg_frame_rate']
@@ -50,11 +50,11 @@ class VideoTrack:
         else:
             avg_fps = 0
         # check for consensus with reported frame rate
-        if avg_fps > 0:
-            ratio = self.fps / avg_fps
-            if ratio < 0.9 or ratio > 1.1:
-                # disagreement with self reported fps
-                use_backup_fps = True
+        #if avg_fps > 0:
+        #    ratio = self.fps / avg_fps
+        #    if ratio < 0.9 or ratio > 1.1:
+        #        # disagreement with self reported fps
+        #        use_backup_fps = True
         if avg_fps > 0 and use_backup_fps:
             # something crazy happened let's try the average fps
             self.fps = avg_fps
