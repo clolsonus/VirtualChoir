@@ -88,7 +88,7 @@ def combine(group, sync_offsets, mute_tracks,
         if suppress_silent_zones and len(commands):
             # temporarily skip non-music suppression
             print("commands:", commands)
-            blend = 300         # ms
+            blend = 100         # ms
             seg = None
             start = 0
             new_sample = None
