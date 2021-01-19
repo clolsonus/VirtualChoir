@@ -62,7 +62,6 @@ def render_combined_video(project, resolution, results_dir,
         output_w = 1920
         output_h = 1080
     output_fps = 30
-    border = 6
     log("output video specs:", output_w, "x", output_h, "fps:", output_fps)
 
     # load/find face locations
@@ -148,7 +147,15 @@ def render_combined_video(project, resolution, results_dir,
         return
 
     # plan and setup the grid
-    grid = VideoGrid(videos, output_w, output_h, border, rows)
+    options = { "frame_w": output_w,
+                "frame_h": output_h,
+                "spacing": 6,
+                "pad_top": 0,
+                "pad_bottom": 0,
+                "pad_left": 0,
+                "pad_right": 0,
+                "rows": rows }
+    grid = VideoGrid(videos, options)
     #spiral = VideoSpiral(videos, output_w, output_h, border)
     
     # open writer for output
@@ -352,7 +359,7 @@ def save_aligned(project, results_dir, video_names, sync_offsets):
         if not "video" in metadata:
             log("No video frames found in:", video_file)
             continue
-        #print(json.dumps(metadata["video"], indent=4))
+        print(json.dumps(metadata["video"], indent=4))
         fps_string = metadata['video']['@r_frame_rate']
         (num, den) = fps_string.split('/')
         fps = float(num) / float(den)

@@ -3,16 +3,21 @@ from random import randrange
 
 from .logger import log
 
-concert_entrance = False
+concert_entrance = True
 
 class VideoGrid:
-    def __init__(self, videos, output_w, output_h, border, rows):
+    def __init__(self, videos, options):
         log("Setting up the video grid:")
-        self.output_w = output_w
-        self.output_h = output_h
-        self.border = border
+        self.frame_w = options["frame_w"]
+        self.frame_h = options["frame_h"]
+        self.spacing = options["spacing"]
+        self.pad_top = options["pad_top"]
+        self.pad_bottom = options["pad_bottom"]
+        self.pad_left = options["pad_left"]
+        self.pad_right = options["pad_right"]
+        rows = options["rows"]
         self.place_count = 0
-        self.even_offset = self.output_w
+        self.even_offset = self.frame_w
         self.last_placed_row = 0
         num_portrait = 0
         num_landscape = 0
@@ -70,10 +75,12 @@ class VideoGrid:
         for i in range(self.num_rows):
             row = self.rows[i]
             cols = row["cols"]
-            row["grid_w"] = int(output_w / cols)
+            output_w = self.frame_w - (self.pad_left + self.pad_right)
+            output_h = self.frame_h - (self.pad_top + self.pad_bottom)
+            row["grid_w"] = int(output_w / cols) 
             row["grid_h"] = int(output_h / self.num_rows)
-            row["cell_w"] = (self.output_w - self.border*(cols+1)) / cols
-            row["cell_h"] = (self.output_h - self.border*(self.num_rows+1)) / self.num_rows
+            row["cell_w"] = (output_w - self.spacing*(cols+1)) / cols
+            row["cell_h"] = (output_h - self.spacing*(self.num_rows+1)) / self.num_rows
             cell_aspect = row["cell_w"] / row["cell_h"]
             print("row:", i, "grid size:", row["grid_w"], "x", row["grid_h"])
             # print("  cell size:", self.cell_w, "x", self.cell_h, "aspect:", cell_aspect)
@@ -89,9 +96,9 @@ class VideoGrid:
         # compute placement/size for each frame (static grid strategy)
         row = 0
         col = 0
-        if self.even_offset < self.output_w:
-            self.even_offset = self.output_w
-        max_step = self.output_w * 0.008
+        if self.even_offset < self.frame_w:
+            self.even_offset = self.frame_w
+        max_step = self.frame_w * 0.008
         if self.num_rows >= 2:
             animated_start = True
         else:
@@ -110,18 +117,18 @@ class VideoGrid:
             cell_w = row_info["cell_w"]
             cell_h = row_info["cell_h"]
             # target grid location
-            x = self.border + col * (cell_w + self.border)
-            y = self.border + row * (cell_h + self.border)
+            x = self.pad_left + self.spacing + col * (cell_w + self.spacing)
+            y = self.pad_top + self.spacing + row * (cell_h + self.spacing)
             if v.place_x is None or v.place_y is None:
                 self.place_count += 1
                 v.sort_order = self.place_count
                 if row > self.last_placed_row:
                     self.last_placed_row = row
-                    self.even_offset = self.output_w + randrange(int(cell_w))
+                    self.even_offset = self.frame_w + randrange(int(cell_w))
                 if concert_entrance:
                     if v.place_x is None:
                         v.place_x = self.even_offset
-                        self.even_offset += (cell_w + self.border)
+                        self.even_offset += (cell_w + self.spacing)
                     if v.place_y is None:
                         v.place_y = y
                 else:
