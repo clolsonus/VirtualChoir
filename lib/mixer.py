@@ -46,10 +46,15 @@ def combine(group, sync_offsets, mute_tracks,
                                   basefile + "-canon.mp3")
         clean_name = os.path.join(group.path, "cache",
                                   basefile + "-clean.mp3")
+        canon_name_f = os.path.join("cache",
+                                  basefile + "-canon.mp3")
+        clean_name_f = os.path.join("cache",
+                                  basefile + "-clean.mp3")
+        log(clean_name)
         if os.path.exists(clean_name):
-            sample = group.load(clean_name)
+            sample = group.load(clean_name_f)
         elif os.path.exists(canon_name):
-            sample = group.load(canon_name)
+            sample = group.load(canon_name_f)
         else:
             log("cannot find canonical audio or cleaned audio, die!")
             quit()
