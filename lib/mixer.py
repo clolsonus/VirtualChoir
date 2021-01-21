@@ -42,16 +42,14 @@ def combine(group, sync_offsets, mute_tracks,
     for i, file in enumerate(group.name_list):
         name = os.path.basename(group.name_list[i])
         basefile, ext = os.path.splitext(name)
-        canon_name = os.path.join(group.path, "cache",
-                                  basefile + "-canon.mp3")
-        clean_name = os.path.join(group.path, "cache",
-                                  basefile + "-clean.mp3")
-        if os.path.exists(clean_name):
-            sample = group.load(clean_name)
-        elif os.path.exists(canon_name):
+        canon_name = os.path.join("cache", basefile + "-canon.mp3")
+        clean_name = os.path.join("cache", basefile + "-clean.mp3")
+        print("names:", canon_name, clean_name)
+        sample = group.load(clean_name)
+        if sample is None:
             sample = group.load(canon_name)
-        else:
-            log("cannot find canonical audio or cleaned audio, die!")
+        if sample is None:
+            log("cannot find cached canonical audio or cleaned audio, die!")
             quit()
         if group.name_list[i] in mute_tracks:
             log("skipping muted:", group.name_list[i])
@@ -146,7 +144,7 @@ def combine(group, sync_offsets, mute_tracks,
         return AudioSegment.silent(1000)
     print("total max:", np.max(y_mixed))
     print("total min:", np.min(y_mixed))
-    min_div = np.max(np.abs(y_mixed)) / 32766
+    min_div = np.max(np.abs(y_mixed)) / 31000 # leave headroom for reverb
     if math.sqrt(mixed_count) > min_div:
         # balsy but good chance of working
         y_mixed /= math.sqrt(mixed_count)
