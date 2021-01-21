@@ -101,11 +101,10 @@ for dir in work_dirs:
     audio_group.clean_noise(clean=clean)
 
     print("aup:", audio_group.aup_file)
-    if args.suppress_noise or not audio_group.aup_file:
-        # we need to do a full analysis if we are asked to suppress noise
-        # or we need to compute sync
-        # audio_group.gen_plots(audio_tracks, sync_offsets=None)
-        pass
+    #if args.suppress_noise or not audio_group.aup_file:
+    #    # we need to do a full analysis if we are asked to suppress noise
+    #    # or we need to compute sync
+    #    audio_group.gen_plots(audio_tracks, sync_offsets=None)
 
     sync_offsets = []
     if not audio_group.aup_file:
