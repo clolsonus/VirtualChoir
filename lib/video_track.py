@@ -58,6 +58,9 @@ class VideoTrack:
         if avg_fps > 0 and use_backup_fps:
             # something crazy happened let's try the average fps
             self.fps = avg_fps
+        if self.fps > 10000:
+            # just, nope.
+            self.fps = 30 # this will bite me later
         codec = metadata['video']['@codec_long_name']
         self.w = int(metadata['video']['@width'])
         self.h = int(metadata['video']['@height'])
