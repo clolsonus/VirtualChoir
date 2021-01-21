@@ -85,20 +85,23 @@ class SampleGroup():
     def load(self, file):
         log("loading audio track:", file)
         basename, ext = os.path.splitext(file)
-        #print(basename, ext)
+        # print(self.path, basename, ext)
         path = os.path.join(self.path, file)
+
+        if not os.path.exists(path):
+            return None
+        
         if ext == ".aif":
             ext = ".aiff"
         elif ext == ".mpeg" or ext == ".m4v":
             ext = ".mp4"
         try:
             sample = AudioSegment.from_file(path, ext[1:])
-        except:
+        except Exception as e:
             # create a song of silence if sample load fails
             log("NOTICE: loading audio failed for:", file)
+            log(str(e))
             sample = AudioSegment.silent(duration=10000)
-        # generic band pass filter to knock off the extreme artifacts
-        # /*goes bad later*/ sample = scipy_effects.band_pass_filter(sample, 50, 4500)
         sample = sample.set_channels(2) # force samples to be stereo
         sample = sample.set_sample_width(2) # force to 2 for this project
         sample = sample.normalize()
