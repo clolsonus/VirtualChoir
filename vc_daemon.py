@@ -50,5 +50,4 @@ while True:
             responses.process( settings )
         
     # subjects = [msg.subject for msg in mailbox.fetch(AND(all=True))]
-    print("  sleeping", settings["interval"], "seconds ...")
     time.sleep(settings["interval"])
