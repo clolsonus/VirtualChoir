@@ -203,7 +203,9 @@ def render_combined_video(project, resolution, results_dir,
                 
                 background = None
                 if crop == "none":
-                    v.shaped_frame = video_crop.get_fit(frame, scale_w, scale_h)
+                    v.shaped_frame = video_crop.get_fit(frame, scale_w, scale_h,
+                                                        int(round(v.size_w)),
+                                                        int(round(v.size_h)))
                 elif crop == "fit":
                     if grid.cell_landscape != vid_landscape:
                         # background/wings full zoom

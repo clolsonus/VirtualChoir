@@ -2,14 +2,24 @@ import cv2
 import numpy as np
 
 # return a scaled versino of the frame that fits
-def get_fit(frame, scale_w, scale_h):
+def get_fit(frame, scale_w, scale_h, cell_w, cell_h):
+    cell = np.zeros(shape=[cell_h, cell_w, 3], dtype=np.uint8)
     if scale_w < scale_h:
         result = cv2.resize(frame, None, fx=scale_w, fy=scale_w,
                             interpolation=cv2.INTER_AREA)
     else:
         result = cv2.resize(frame, None, fx=scale_h, fy=scale_h,
                             interpolation=cv2.INTER_AREA)
-    return result
+    if cell_w > result.shape[1]:
+        x = int((cell_w - result.shape[1])*0.5)
+    else:
+        x = 0
+    if cell_h > result.shape[0]:
+        y = int((cell_h - result.shape[0])*0.5)
+    else:
+        y = 0
+    cell[y:y+result.shape[0],x:x+result.shape[1]] = result
+    return cell
 
 # return a scaled version of the frame that stretches vertically and
 # is cropped (if needed) horizontally
