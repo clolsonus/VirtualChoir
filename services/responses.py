@@ -145,7 +145,7 @@ def run_job(settings, request):
     if len(request['Video Options']):
         options = request['Video Options'].split(", ")
         for o in options:
-            if o.lower().startswith("No Video"):
+            if o.lower().startswith("no video"):
                 audio_only = True
                 command.append("--no-video")
             elif o.lower().startswith("mute videos"):
