@@ -41,3 +41,19 @@ def load(path):
                 else:
                     log("unknwon hint in hint.txt:", row)
     return hints
+
+def validate( hints, audio_tracks, video_tracks ):
+    log("Validating hints:")
+    hint_names = set()
+    for file in audio_tracks + video_tracks:
+        name = os.path.basename(file)
+        hint_names.add(name)
+    errors = False
+    for name in hints.keys():
+        if not name in hint_names:
+            log("  Error: file name in hints.txt file not found in project:", name)
+            errors = True
+    if errors:
+        log("Name mismatches found in hints.txt file")
+    else:
+        log("All names in hints.txt file match up ok.")

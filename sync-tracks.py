@@ -61,6 +61,7 @@ hint_dict = {}
 for dir in work_dirs:
     hint_dict.update( hints.load(dir) )
 log("hints:", hint_dict)
+hints.validate( hint_dict, all_audio_tracks, all_video_tracks )
 
 # make results directory (if it doesn't exist)
 results_dir = os.path.join(args.project, "results")
