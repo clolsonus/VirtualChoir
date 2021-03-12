@@ -23,7 +23,7 @@ email: virtualchoir@flightgear.org
 description: >- # this means to ignore newlines until "baseurl:"
   Virtual Choir Maker is free software to help you quickly and easily build your next virtual choir video.
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "https:/virtualchoir.flightgear.org" # the base hostname & protocol for your site, e.g. http://example.com
+url: "https://virtualchoir.flightgear.org" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: clolsonus
 github_username:  clolsonus
 
