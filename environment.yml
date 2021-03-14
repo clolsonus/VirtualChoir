@@ -1,0 +1,17 @@
+name: vchoir
+channels:
+  - defaults
+dependencies:
+  - python=3.8.5
+  - libgcc-ng
+  - lxml
+  - tqdm
+  - matplotlib
+  - cmake
+  - pip
+  - pip:
+    - librosa
+    - pydub
+    - opencv-python
+    - sk_video
+    - dlib

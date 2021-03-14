@@ -140,6 +140,25 @@ When I do this sort of thing, I run the script, see what package
 import fails, install it, repeat ..., eventually I have all the
 dependencies and the script works, yeah!
 
+## Ubuntu Instructions using Conda
+
+The following has been tested on Ubuntu 20.04.
+
+1. Open terminal and open system packages:
+```bash
+sudo apt install sox libsox-fmt-all ffmpeg gcc g++ make
+```
+2. Install [Anaconda](https://www.anaconda.com/products/individual) or conda package manager
+3. Open a terminal, create environment `vchoir`, and activate it.
+```bash
+conda env create --file environment.yml
+conda activate vchoir
+```
+4. Run test using demo clips
+```bash
+python sync-tracks.py demo_clips/ --crop none
+```
+
 # Questions:
 
 I'm sure you have many.  Please feel free to ask for help!  As I write
@@ -160,4 +179,3 @@ all worth while!
 ## Sample recording instructions:
 
    https://docs.google.com/document/d/1mWFmZ76PZErq-XEIeCNmw1FZdtWXVHjOARTSdNITCzA/edit?usp=sharing
-
