@@ -1,1 +1,8 @@
 *~
+*/__pycache__/
+
+# Build results
+results/
+cache/
+*/audacity_import.lof
+*/full-mix.mp3
