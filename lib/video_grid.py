@@ -51,6 +51,8 @@ class VideoGrid:
             self.num_rows = int(math.sqrt(num_good_videos / 1.6))
             cols = self.num_rows
             remainder = num_good_videos - self.num_rows*self.num_rows
+        if self.num_rows < 1:
+            self.num_rows = 1
         # setup basic row records
         self.rows = []
         for i in range(self.num_rows):
