@@ -32,8 +32,9 @@ parser.add_argument('--resolution', default='1080p',
                     choices=['480p', '720p', '1080p', '1440p'],
                     help='video output resolution')
 parser.add_argument('--rows', type=int, help='request specific number of video rows')
-parser.add_argument('--crop', default='face', choices=['face', 'fit', 'none'],
+parser.add_argument('--crop', default='face', choices=['face', 'face-wide', 'fit', 'none'],
                     help='video scaling/cropping strategy')
+parser.add_argument('--pad-bottom', type=int, default=0, help='pad bottom with empty pixels to leave room for something to be added in later.')
 args = parser.parse_args()
 
 log("Begin processing job", fancy=True)
@@ -71,6 +72,9 @@ if not os.path.exists(results_dir):
 
 # initialize logger
 logger.init( os.path.join(results_dir, "report.txt") )
+
+if False and args.write_aligned_tracks:
+    mixer.clear_aligned(results_dir)
 
 for dir in work_dirs:
     if dir == work_dirs[-1]:
@@ -208,7 +212,8 @@ if len(all_video_tracks) and not args.no_video:
                                  hints=hint_dict, rows=args.rows,
                                  crop=args.crop,
                                  title_page=title_page,
-                                 credits_page=credits_page )
+                                 credits_page=credits_page,
+                                 pad_bottom=args.pad_bottom)
     video.merge( args.project, results_dir )
     
 else:
