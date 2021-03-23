@@ -62,15 +62,18 @@ def overlay_frames(bg, fg):
     bg[y:y+fg.shape[0],x:x+fg.shape[1]] = fg
     return bg
 
-def fit_face(v):
-    if v.face.count > 0 and not v.local_time is None:
+def fit_face(v, pad=0.5):
+    #print("face.count:", v.face.count)
+    if v.face.count > 5 and not v.local_time is None:
         (l, r, t, b) = v.face.get_face(v.local_time, 1.0)
+        #print("face:", l, r, t, b)
     else:
         (b, r) = v.raw_frame.shape[:2]
         l = 0
         t = 0
     face_area = (r - l) * (b - t)
     cell_area = v.size_w * v.size_h
+    #print("face_area:", face_area, "cell_area:", cell_area)
     if face_area < 2 * cell_area:
         # try something crazy (subpixel cropping by scaling up and
         # then back down)
@@ -93,10 +96,11 @@ def fit_face(v):
     w = r - l
     h = b - t
     # ideal shape to pad around face
-    padw = w * 0.5
-    padh = h * 0.5 
+    padw = w * pad
+    padh = h * pad 
     wanth = h + 3*padh
     wantw = wanth * size_ar + 1
+    #print("want h/w:", wanth, wantw)
 
     # expand our area to match the raw frame aspect ratio
     # if frame_ar < face_ar:
@@ -137,6 +141,9 @@ def fit_face(v):
     croph, cropw = crop.shape[:2]
     if croph == 0:
         # debug
+        print("l,r,t,b:", l, r, t, b)
+        print("want:", wantl, wantt, wantw, wanth)
+        print("crop shape:", crop.shape)
         print("name:", v.file, "face:", l, r, t, b)
     scale_h = v.size_h / croph
     final = get_fit_height(crop, scale_h)
