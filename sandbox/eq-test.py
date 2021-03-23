@@ -24,7 +24,7 @@ def custom_eq(sample, demud_gain=1.2, intel_gain=1.2):
 
     sos = signal.butter(10, 100, 'lp', fs=sample.frame_rate, output='sos')
     filtered = signal.sosfilt(sos, raw).astype(float)
-    bands.append(filtered)
+    bands.append(filtered*0)
     
     sos = signal.butter(10, [100, 250], 'bp', fs=sample.frame_rate, output='sos')
     filtered = signal.sosfilt(sos, raw).astype(float)
@@ -48,7 +48,7 @@ def custom_eq(sample, demud_gain=1.2, intel_gain=1.2):
     
     sos = signal.butter(10, 5000, 'hp', fs=sample.frame_rate, output='sos')
     filtered = signal.sosfilt(sos, raw).astype(float)
-    bands.append(filtered)
+    bands.append(filtered*0)
     
     result = bands[0]
     for b in bands[1:]:
@@ -81,70 +81,10 @@ def custom_eq(sample, demud_gain=1.2, intel_gain=1.2):
 
     return result
 
-def blah_custom_eq(sample,
-              low_db=0, demud_db=0, intel_db=0, air_db=0):
-    sample.set_channels(1) # tmp
-    
-    print("eq-ing ...")
-    bands = []
-    bands.append( scipy_effects.low_pass_filter(sample, 100) + low_db )
-    bands.append( scipy_effects.band_pass_filter(sample, 100, 250) )
-    bands.append( scipy_effects.band_pass_filter(sample, 250, 300) + demud_db )
-    bands.append( scipy_effects.band_pass_filter(sample, 300, 2500) )
-    bands.append( scipy_effects.band_pass_filter(sample, 2500, 3000) + intel_db )
-    bands.append( scipy_effects.band_pass_filter(sample, 3000, 10000) )
-    bands.append( scipy_effects.band_pass_filter(sample, 10000, 16000) + air_db )
-    bands.append( scipy_effects.high_pass_filter(sample, 16000) )
-    result = bands[0]
-    for b in bands[1:]:
-        result = result.overlay(b)
-
-    plt.figure()
-
-    sample.set_channels(1)
-    raw = sample.get_array_of_samples()
-    fft = np.fft.rfft(raw)
-    freq = np.fft.rfftfreq(len(raw), d=1/sample_rate)
-    plt.plot(freq, np.abs(fft), label="sample")
-
-    if True:
-        for i, b in enumerate(bands[1:2]):
-            b.set_channels(1)
-            raw = b.get_array_of_samples()
-            fft = np.fft.rfft(raw)
-            freq = np.fft.rfftfreq(len(raw), d=1/sample_rate)
-            plt.plot(freq, np.abs(fft), label="band %d" % i)
-    
-    result.set_channels(1)
-    raw = result.get_array_of_samples()
-    fft = np.fft.rfft(raw)
-    freq = np.fft.rfftfreq(len(raw), d=1/sample_rate)
-    plt.plot(freq, np.abs(fft), label="eq result")
-    
-    #fig, ax = plt.subplots(nrows=8, sharex=True, sharey=True)
-    #oenv = librosa.onset.onset_strength(y=np.array(raw).astype('float'),
-    #                                    sr=sample_rate,
-    #                                    hop_length=hop_length)
-    #t = librosa.times_like(oenv, sr=sample_rate, hop_length=hop_length)
-    #chroma = librosa.feature.chroma_cqt(y=np.array(raw).astype('float'),
-    #                                    sr=sample_rate,
-    #                                    hop_length=hop_length)
-    #img = librosa.display.specshow(chroma,
-    #                               x_axis='time',
-    #                               y_axis='chroma',
-    #                               hop_length=int(hop_length*0.5), ax=ax[0])
-    #fig.colorbar(img, ax=ax)a
-
-    plt.legend()
-    plt.show()
-
-    return result
-
 print("Loading sample:", args.file)
 basename, ext = os.path.splitext(args.file)
 sample = AudioSegment.from_file(args.file, ext[1:])
-#result = blah_custom_eq(sample, 6, 6, 6, 6)
-result = custom_eq(sample, 3, 3)
+result = custom_eq(sample, 1.2, 1.2)
 print(np.min(result), np.max(result))
 result = np.int16(result)
 eqd = AudioSegment(result.tobytes(), frame_rate=sample.frame_rate, sample_width=2, channels=1)
