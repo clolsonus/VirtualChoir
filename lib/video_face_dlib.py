@@ -86,6 +86,16 @@ class FaceDetect():
         r = self.right_func(time)*scale
         t = self.top_func(time)*scale
         b = self.bottom_func(time)*scale
+        # catch a situation where face find/prediction is sketchy and
+        # inverts itself
+        if r < l:
+            tmp = r
+            r = l
+            l = tmp
+        if t > b:
+            tmp = t
+            t = b
+            b = tmp
         w = r - l
         h = b - t
         if h > 0:
