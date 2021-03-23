@@ -158,18 +158,19 @@ def combine(group, sync_offsets, mute_tracks,
     mixed.normalize()
     return mixed
 
-# presumes the mixer has updated each sample with align/trim/pad and
-# noise suppression if requested, so this function just writes those
-# out without further modification.
-def save_aligned(results_dir, names, samples, mute_tracks,):
-    # first clean out any previous aligned_audio tracks in case tracks
-    # have been updated or added or removed since the previous run.
+def clear_aligned(results_dir):
+    # clean out any previous aligned_audio tracks in case tracks have
+    # been removed since the previous run.
     for file in sorted(os.listdir(results_dir)):
         if file.startswith("aligned_audio_"):
             fullname = os.path.join(results_dir, file)
             log("NOTICE: deleting file from previous run:", file)
             os.unlink(fullname)
-        
+    
+# presumes the mixer has updated each sample with align/trim/pad and
+# noise suppression if requested, so this function just writes those
+# out without further modification.
+def save_aligned(results_dir, names, samples, mute_tracks,):
     log("Writing aligned version of samples (padded/trimed)...", fancy=True)
     for i, sample in enumerate(samples):
         if names[i] in mute_tracks:
