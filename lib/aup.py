@@ -141,7 +141,7 @@ def build_offset_map(path):
             offsets.update( result )
         else:
             # better find a .lof file
-            result = parse_lof( os.path.join(dir, "audacity_import.lof"),
+            result = parse_lof( os.path.join(dir, os.path.basename(dir) + "_audacity_import.lof"),
                                 dir_offset, pretty_path )
             offsets.update( result )
     print("OFFSETS:", offsets)

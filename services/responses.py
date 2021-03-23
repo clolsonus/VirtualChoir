@@ -2,6 +2,7 @@ import csv
 from datetime import datetime
 import json
 import os
+from pathlib import Path
 import subprocess
 import tempfile
 import time
@@ -45,11 +46,12 @@ def process( settings ):
         save_last_time(new_time)        
 
 def send_results(settings, request, subject, file_list):
+    name_list = [str(i) for i in file_list]
     # send the results
     command = [ "./bin/FilemailCli",
                 "--username=%s" % settings["filemail_email"],
                 "--userpassword=%s" % settings["filemail_password"],
-                "--files=%s" % ",".join(file_list),
+                "--files=%s" % ",".join(name_list),
                 "--to=%s" % request["Email Address"],
                 "--from=noreply-virtualchoir@flightgear.org",
                 "--subject=%s" % subject,
@@ -195,20 +197,15 @@ def run_job(settings, request):
 
     # generate list of files
     file_list = []
-    # include the subfolder/group mixes
-    for file in sorted(os.listdir(work_dir)):
-        if file.endswith("-mix.mp3"):
-            file_list.append( os.path.join(work_dir, file) )
-    # include the main results
-    for file in sorted(os.listdir(results_dir)):
-        if not aligned_tracks and file.startswith("aligned_"):
-            pass
-        elif file == "silent_video.mp4":
-            pass
-        elif audio_only and file == "gridded_video.mp4":
-            pass
-        else:
-            file_list.append( os.path.join(results_dir, file) )
+    file_list += Path(work_dir).glob("*-mix.mp3")
+    file_list += Path(work_dir).rglob("*_audacity_import.lof")
+    if aligned_tracks:
+        file_list += Path(results_dir).glob("aligned_*")
+    if not audio_only:
+        file_list += Path(results_dir).glob("gridded_video.mp4")
+    file_list += Path(results_dir).glob("full-mix.mp3")
+    file_list += Path(results_dir).glob("report.txt")
+    file_list += Path(results_dir).glob("wrong_file.txt")
     print("sending files:", file_list)
     if "Song Name" in request and len(request["Song Name"]):
         song_name = request["Song Name"]

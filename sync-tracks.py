@@ -136,7 +136,7 @@ for dir in work_dirs:
             audio_group.sync_by_claps(plot=False)
 
         log("Generating audacity_import.lof file")
-        with open(os.path.join(dir, "audacity_import.lof"), 'w') as fp:
+        with open(os.path.join(dir, os.path.basename(dir) + "_audacity_import.lof"), 'w') as fp:
             for i in range(len(audio_group.offset_list)):
                 fp.write('file "%s" offset %.3f\n' % (audio_group.name_list[i], audio_group.offset_list[i]))
         for i in range(len(audio_group.offset_list)):
