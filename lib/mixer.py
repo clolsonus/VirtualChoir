@@ -120,7 +120,8 @@ def combine(group, sync_offsets, mute_tracks,
                 print("lengths:", len(sample), len(new_sample))
                 sample = new_sample
                 # renormalized in case we suppressed something crazy
-                sample = sample.normalize()
+                # sample = sample.normalize()
+                # don't do this because we are using rms to do scaling now
         sr = sample.frame_rate
         sync_ms = sync_offset
         if sync_ms >= 0:

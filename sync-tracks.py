@@ -158,7 +158,7 @@ for dir in work_dirs:
     else:
         mute_tracks = []
     mixed = mixer.combine(audio_group, sync_offsets,
-                          mute_tracks, hints=hint_dict, pan_range=0.3,
+                          mute_tracks, hints=hint_dict, pan_range=0.2,
                           suppress_silent_zones=suppress_silent_zones)
     log("Mixed audio file:", group_file)
     
