@@ -36,7 +36,10 @@ def combine(group, sync_offsets, mute_tracks,
             pass
         elif "reference" in name.lower():
             mute_tracks.append(name)
-                
+
+    rms_mean = np.mean(group.rms_list)
+    log("RMS mean: %.0f" % rms_mean)
+    
     y_mixed = None
     mixed_count = 0
     for i, file in enumerate(group.name_list):
@@ -62,13 +65,20 @@ def combine(group, sync_offsets, mute_tracks,
             track_gain = hints[basename]["gain"]
         else:
             track_gain = 1.0
-        mixed_count += track_gain
+        if group.rms_list[i] > 0:
+            rms_gain = rms_mean / group.rms_list[i]
+        else:
+            rms_gain = 1
+        total_gain = track_gain * rms_gain
+        log("RMS: %.0f gain: %.3f" % (group.rms_list[i], rms_mean/group.rms_list[i]) )
+        
+        mixed_count += total_gain
         if sync_offsets is None:
             sync_offset = 0
         else:
             sync_offset = sync_offsets[i]
-        log(" ", group.name_list[i], "offset(sec):", sync_offset/1000,
-            "gain:", track_gain)
+        log(" ", group.name_list[i], "offset(sec): %.3f" % (sync_offset/1000),
+            "user gain: %.1f" % track_gain, "total gain: %.2f" % total_gain)
         sample = sample.set_channels(2)
         if pan_range > 0.00001 and pan_range <= 1.0:
             sample = sample.pan( random.uniform(-pan_range, pan_range) )
@@ -122,12 +132,12 @@ def combine(group, sync_offsets, mute_tracks,
         synced_sample = synced_sample[:duration_ms]
         synced_sample = synced_sample.fade_out(1000)
         group.sample_list[i] = synced_sample
-        
+
         y = np.array(synced_sample.get_array_of_samples()).astype('double')
         print(i, "max:", np.max(y))
         #print(" ", y.shape)
         if y_mixed is None:
-            y_mixed = y * track_gain
+            y_mixed = y * total_gain
         else:
             # extend y_mixed array length if needed
             if y_mixed.shape[0] < y.shape[0]:
@@ -138,7 +148,7 @@ def combine(group, sync_offsets, mute_tracks,
                 diff = y_mixed.shape[0] - y.shape[0]
                 #print("extending sample by:", diff)
                 y = np.concatenate([y, np.zeros(diff)], axis=None)
-            y_mixed += (y * track_gain)
+            y_mixed += (y * total_gain)
     if mixed_count < 1:
         log("No unmuted audio tracks found.")
         return AudioSegment.silent(1000)

@@ -103,6 +103,7 @@ for dir in work_dirs:
     audio_group.compute_intensities()
     audio_group.compute_clarities()
     audio_group.compute_envelopes()
+    audio_group.compute_rms()
     audio_group.clean_noise(clean=clean)
 
     print("aup:", audio_group.aup_file)

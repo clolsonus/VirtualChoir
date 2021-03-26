@@ -3,6 +3,7 @@
 import json
 import librosa
 import librosa.display
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -29,6 +30,7 @@ class SampleGroup():
         self.offset_list = []
         self.intensity_list = []
         self.clarity_list = []
+        self.rms_list = []
         self.note_list = []
         self.envelope_list = []
         self.suppress_list = None
@@ -176,7 +178,7 @@ class SampleGroup():
             intensity = []
             base = 0
             while base < len(raw):
-                intensity.append(np.max(raw[base:base+hop_length]))
+                intensity.append(np.max(np.abs(raw[base:base+hop_length])))
                 base += hop_length
             self.intensity_list.append( np.array(intensity).astype('float') )
 
@@ -233,6 +235,30 @@ class SampleGroup():
                     np.save(f, clarity.T)
             self.clarity_list.append(clarity)
 
+    def compute_rms(self):
+        # compute an rms metric for track, but just over the areas
+        # where clarity > threshold
+        log("Estimating rms for active regions:")
+        self.rms_list = []
+        for i in range(len(self.clarity_list)):
+            clarity = self.clarity_list[i]
+            intensity = self.intensity_list[i]
+            # 3print("track:", i, len(clarity), len(intensity))
+            mean = np.mean(clarity)
+            std = np.std(clarity)
+            threshold = std * 0.1
+            sum = 0
+            count = 0
+            for j in range(len(clarity)):
+                if clarity[j] >= threshold:
+                    sum += intensity[j]*intensity[j]
+                    count += 1
+            if count > 0:
+                self.rms_list.append( math.sqrt(sum / count) )
+            else:
+                self.rms_list.append( 0 )
+        log("rms:", self.rms_list)
+        
     def compute_envelopes(self):
         self.envelope_list = []
         self.suppress_list = []
@@ -245,8 +271,8 @@ class SampleGroup():
             env = []
             commands = []
             print("track:", i, len(clarity), len(times))
-            mean = np.mean(self.clarity_list[i])
-            std = np.std(self.clarity_list[i])
+            mean = np.mean(clarity)
+            std = np.std(clarity)
             threshold = std * 0.1
             start = 0
             end = 0
