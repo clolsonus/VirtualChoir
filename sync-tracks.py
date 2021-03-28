@@ -95,7 +95,10 @@ for dir in work_dirs:
     audio_group = analyze.SampleGroup(dir)
     audio_group.scan()
     audio_group.load_samples()
-    
+    if not len(audio_group.sample_list):
+        # nothing to do here
+        log("No audio/video tracks in this group:", dir)
+        continue
     # generate mono version, set consistent sample rate, and filer for
     # analysis step
     audio_group.compute_raw()
