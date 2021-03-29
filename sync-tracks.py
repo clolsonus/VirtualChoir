@@ -81,7 +81,7 @@ for dir in work_dirs:
         # last dir (top level)
         group_file = os.path.join(results_dir, "full-mix.mp3")
         clean = 0.1
-        suppress_silent_zones = False
+        suppress_silent_zones = True
     else:
         group_file = os.path.join(dir + "-mix.mp3")
         clean = 0.25
@@ -110,11 +110,7 @@ for dir in work_dirs:
     audio_group.clean_noise(clean=clean)
 
     print("aup:", audio_group.aup_file)
-    #if args.suppress_noise or not audio_group.aup_file:
-    #    # we need to do a full analysis if we are asked to suppress noise
-    #    # or we need to compute sync
-    #    audio_group.gen_plots(audio_tracks, sync_offsets=None)
-
+    
     sync_offsets = []
     if not audio_group.aup_file:
         # let's figure out the autosync, fingers crossed!!!
@@ -152,6 +148,9 @@ for dir in work_dirs:
         sync_offsets = aup.offsets_from_aup(audio_group.name_list,
                                             audio_group.sample_list,
                                             dir, audio_group.aup_file)
+
+    if False:
+        audio_group.gen_plots(sync_offsets=None)
 
     log("Mixing samples...", fancy=True)
 

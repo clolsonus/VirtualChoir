@@ -623,7 +623,7 @@ class SampleGroup():
                 sample.export(clean_name, format="mp3")
                 
     # visualize audio streams (using librosa functions)
-    def gen_plots(self, names, sync_offsets=None):
+    def gen_plots(self, sync_offsets=None):
         print("Generating basic clip waveform...")
         # plot basic clip waveforms
         fig, ax = plt.subplots(nrows=len(self.raw_list),
@@ -634,7 +634,7 @@ class SampleGroup():
             else:
                 trimval = int(round(sync_offsets[i] * sample_rate / 1000))
             librosa.display.waveplot(np.array(self.raw_list[i][trimval:]).astype('float'), sr=sample_rate, ax=ax[i])
-            ax[i].set(title=names[i])
+            ax[i].set(title=self.name_list[i])
             ax[i].label_outer()
             if ( len(self.beat_list) ):
                 for b in self.beat_list[i]:
@@ -659,7 +659,7 @@ class SampleGroup():
             ax[i].plot(self.time_list[i][:min], self.intensity_list[i][:min])
         
         # skip chroma plots for now on long samples, takes forever ...
-        if True:
+        if len(self.chroma_list) == len(self.raw_list):
             # compute and plot chroma representation of clips (notice: work
             # around displaying specshow that seems to assume stereo samples,
             # but we are passing in mono here)
@@ -668,7 +668,7 @@ class SampleGroup():
             fig, ax = plt.subplots(nrows=len(self.raw_list),
                                    sharex=True, sharey=True)
             for i in range(len(self.raw_list)):
-                print(" ", names[i])
+                print(" ", self.name_list[i])
                 if sync_offsets is None:
                     trimval = 0
                 else:
@@ -677,26 +677,26 @@ class SampleGroup():
                                                x_axis='time',
                                                y_axis='chroma',
                                                hop_length=int(hop_length*0.5), ax=ax[i])
-                ax[i].set(title='Chroma Representation of ' + names[i])
+                ax[i].set(title='Chroma Representation of ' + self.name_list[i])
             fig.colorbar(img, ax=ax)
 
-            print("Note clarity plot...")
-            fig, ax = plt.subplots(nrows=len(self.raw_list),
-                                   sharex=True, sharey=True)
-            for i in range(len(self.raw_list)):
-                a = len(self.time_list[i])
-                c = self.clarity_list[i].shape[0]
-                min = np.min([a, b, c])
-                mean = np.mean(self.clarity_list[i])
-                std = np.std(self.clarity_list[i])                
-                print(i, len(self.time_list[i]), len(self.intensity_list[i]),
-                      self.chroma_list[i].shape[1]) 
-                ax[i].plot(self.time_list[i][:min], self.clarity_list[i][:min])
-                max = np.max(self.clarity_list[i])
-                if not self.envelope_list is None:
-                    env = np.array(self.envelope_list[i]).astype('float').T
-                    ax[i].plot(env[0,:], env[1,:]*max)
-                ax[i].hlines(y=mean, xmin=0, xmax=1)
-                ax[i].hlines(y=std, xmin=0, xmax=1)
+        print("Note clarity plot...")
+        fig, ax = plt.subplots(nrows=len(self.raw_list),
+                               sharex=True, sharey=True)
+        for i in range(len(self.raw_list)):
+            a = len(self.time_list[i])
+            c = self.clarity_list[i].shape[0]
+            min = np.min([a, b, c])
+            mean = np.mean(self.clarity_list[i])
+            std = np.std(self.clarity_list[i])                
+            print(i, len(self.time_list[i]), len(self.intensity_list[i]),
+                  self.clarity_list[i].shape) 
+            ax[i].plot(self.time_list[i][:min], self.clarity_list[i][:min])
+            max = np.max(self.clarity_list[i])
+            if not self.envelope_list is None:
+                env = np.array(self.envelope_list[i]).astype('float').T
+                ax[i].plot(env[0,:], env[1,:]*max)
+            ax[i].hlines(y=mean, xmin=0, xmax=1)
+            ax[i].hlines(y=std, xmin=0, xmax=1)
        
         plt.show()

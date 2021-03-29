@@ -96,10 +96,10 @@ def combine(group, sync_offsets, mute_tracks,
         if suppress_silent_zones and len(commands):
             # temporarily skip non-music suppression
             print("commands:", commands)
-            blend = 100         # ms
+            blend = 200         # ms
             seg = None
             start = 0
-            new_sample = None
+            new_sample = sample
             for cmd in commands:
                 #print("command:", cmd)
                 (t0, t1) = cmd
@@ -108,13 +108,18 @@ def combine(group, sync_offsets, mute_tracks,
                 #print("  start:", start, "range:", ms0, ms1)
                 if ms1 - ms0 < 2*blend + 1:
                     # too short to deal with
+                    #print("  too short, skipping")
                     continue
-                begin = sample[:ms0+blend]
+                begin = new_sample[:ms0+blend]
                 #print("silent:", ms0, ms1)
                 silent = AudioSegment.silent(duration=ms1-ms0)
-                end = sample[ms1-blend:]
+                end = new_sample[ms1-blend:]
                 new_sample = begin.append(silent, crossfade=blend)
                 new_sample = new_sample.append(end, crossfade=blend)
+            # new_sample.export("debug1-tmp.mp3", format="mp3",
+            #                   tags={'artist': 'Various', 'album': 'Virtual Choir Maker',
+            #                         'comments': 'https://virtualchoir.flightgear.org'})
+            # quit()
             if not new_sample is None:
                 # we processed some commands
                 print("lengths:", len(sample), len(new_sample))
