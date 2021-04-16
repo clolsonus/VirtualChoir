@@ -96,7 +96,7 @@ def combine(group, sync_offsets, mute_tracks,
         if suppress_silent_zones and len(commands):
             # temporarily skip non-music suppression
             print("commands:", commands)
-            blend = 200         # ms
+            blend = 300         # ms
             seg = None
             start = 0
             new_sample = sample
@@ -106,7 +106,7 @@ def combine(group, sync_offsets, mute_tracks,
                 ms0 = int(round(t0*1000))
                 ms1 = int(round(t1*1000))
                 #print("  start:", start, "range:", ms0, ms1)
-                if ms1 - ms0 < 2*blend + 1:
+                if ms1 - ms0 < 8*blend + 1:
                     # too short to deal with
                     #print("  too short, skipping")
                     continue
@@ -160,7 +160,7 @@ def combine(group, sync_offsets, mute_tracks,
         return AudioSegment.silent(1000)
     print("total max:", np.max(y_mixed))
     print("total min:", np.min(y_mixed))
-    min_div = np.max(np.abs(y_mixed)) / 31000 # leave headroom for reverb
+    min_div = np.max(np.abs(y_mixed)) / 30000 # leave headroom for reverb
     if math.sqrt(mixed_count) > min_div:
         # balsy but good chance of working
         y_mixed /= math.sqrt(mixed_count)
