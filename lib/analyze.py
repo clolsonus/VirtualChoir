@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 from pydub import AudioSegment, scipy_effects # pip install pydub
+from pydub.playback import play
+from scipy import signal
 from subprocess import call
 from tqdm import tqdm
 
@@ -84,6 +86,25 @@ class SampleGroup():
         self.video_list = video_tracks
         self.aup_file = aup_file
 
+    def filter_extremes(self, sample):
+        channels = sample.split_to_mono()
+        raws = []
+        for ch in channels:
+            raws.append( ch.get_array_of_samples() )
+        sos = signal.butter(4, [120, 4500], 'bp', fs=sample.frame_rate, output='sos')
+        filtered = []
+        for raw in raws:
+            filt = signal.sosfilt(sos, raw).astype(float)
+            max = np.max(np.abs(filt))
+            if max > 31000:
+                filt *= (31000/max)
+            #print("max:", np.max(np.abs(filt)))
+            filt = np.int16( filt )
+            seg = AudioSegment(filt.tobytes(), frame_rate=sample.frame_rate, sample_width=2, channels=1)
+            filtered.append( seg )
+        result = AudioSegment.from_mono_audiosegments(*filtered)
+        return result
+        
     def load(self, file):
         log("loading audio track:", file)
         basename, ext = os.path.splitext(file)
@@ -108,6 +129,7 @@ class SampleGroup():
         sample = sample.set_sample_width(2) # force to 2 for this project
         sample = sample.normalize()
         sample = sample.set_frame_rate(sample_rate)
+        sample = self.filter_extremes(sample)
         return sample
 
     def load_samples(self):
