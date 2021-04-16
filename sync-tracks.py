@@ -25,6 +25,8 @@ parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
                     help='sync strategy')
 parser.add_argument('--reference', help='file name of declared refrence track')
 parser.add_argument('--suppress-noise', action='store_true', help='try to suppress extraneous noises.')
+parser.add_argument('--reverb', default='light', choices=['light', 'medium', 'heavy'],
+                    help='how much reverb in the final mix?')
 parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
 parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
 parser.add_argument('--no-video', action='store_true', help='skip the video production.')
@@ -166,7 +168,12 @@ for dir in work_dirs:
     
     if dir == work_dirs[-1]:
         # top level final mix, write a temp file, then add reverb with sox
-        reverb = 50
+        if args.reverb == "light":
+            reverb = 50
+        elif args.reverb == "medium":
+            reverb = 60
+        elif args.reverb == "heavy":
+            reverb = 75
         mixed.export(group_file + "-tmp.mp3", format="mp3",
                      tags={'artist': 'Various', 'album': 'Virtual Choir Maker',
                            'comments': 'https://virtualchoir.flightgear.org'})
