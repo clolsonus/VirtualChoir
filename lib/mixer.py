@@ -155,7 +155,7 @@ def combine(group, sync_offsets, mute_tracks,
                 #print("extending sample by:", diff)
                 y = np.concatenate([y, np.zeros(diff)], axis=None)
             y_mixed += (y * total_gain)
-    if mixed_count < 1:
+    if mixed_count < 0.01:
         log("No unmuted audio tracks found.")
         return AudioSegment.silent(1000)
     print("total max:", np.max(y_mixed))
