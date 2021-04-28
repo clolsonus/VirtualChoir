@@ -150,12 +150,14 @@ class gdrive():
                 print("INFO: Preserving local work directory:", file)
             elif ext == ".lof":
                 print("INFO: Preserving local .lof file:", file)
-            elif ext == ".txt":
+            elif ext == ".txt" or ext == ".json":
                 # maybe I created a hints.txt locally that I'd like to
-                # preserve
+                # preserve, or a sync.json
                 print("INFO: Preserving local file:", file)
             elif ext == ".aup" or (file.endswith("_data") and os.path.isdir(os.path.join(work_dir, file))):
-                print("INFO: Preserving audacity project:", file)
+                print("INFO: Preserving audacity 2.x project:", file)
+            elif ext == ".aup3":
+                print("INFO: Preserving audacty 3.x project:", file)
             elif not file in remote_names:
                 trashed_file = os.path.join(work_dir, file)
                 print("NOTICE: deleting local file:", trashed_file)

@@ -38,13 +38,13 @@ class SampleGroup():
         self.suppress_list = None
         self.leadin_list = []
         self.fadeout_list = []
-        self.aup_file = None
+        self.sync_file = None
 
     def load_all_samples_deprecated(self):
-        audio_tracks, video_tracks, aup_file = scan.scan_directory(self.path)
+        audio_tracks, video_tracks, sync_file = scan.scan_directory(self.path)
         log("loading audio tracks:", audio_tracks)
         self.name_list = audio_tracks
-        self.aup_file = aup_file
+        self.sync_file = sync_file
         max_frame_rate = 0
         self.sample_list = []
         for track in self.name_list:
@@ -80,11 +80,11 @@ class SampleGroup():
         return cache_dir
         
     def scan(self):
-        audio_tracks, video_tracks, aup_file = scan.scan_directory(self.path)
+        audio_tracks, video_tracks, sync_file = scan.scan_directory(self.path)
         log("found audio tracks:", audio_tracks)
         self.name_list = audio_tracks
         self.video_list = video_tracks
-        self.aup_file = aup_file
+        self.sync_file = sync_file
 
     def filter_extremes(self, sample):
         channels = sample.split_to_mono()

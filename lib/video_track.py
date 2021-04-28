@@ -149,6 +149,7 @@ class VideoTrack:
         for i in range(skip_frames):
             self.reader._readFrame()
 
+    # deprecated?
     def next_frame(self):
         try:
             frame = self.reader._readFrame()

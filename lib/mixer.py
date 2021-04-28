@@ -10,8 +10,11 @@ def combine(group, sync_offsets, mute_tracks,
             hints={}, pan_range=0, suppress_silent_zones=False):
     durations_ms = []
     for i, sample in enumerate(group.sample_list):
+        name = os.path.basename(group.name_list[i])
+        offset = sync_offsets[name]["offset"]
+        print(name, offset)
         # print(group.name_list[i], len(sample) / 1000, sync_offsets[i])
-        durations_ms.append( len(sample) - sync_offsets[i] )
+        durations_ms.append( len(sample) + offset )
     duration_ms = np.median(durations_ms)
     log("median audio duration (sec):", duration_ms / 1000)
 
@@ -44,6 +47,7 @@ def combine(group, sync_offsets, mute_tracks,
     mixed_count = 0
     for i, file in enumerate(group.name_list):
         name = os.path.basename(group.name_list[i])
+        offset = sync_offsets[name]["offset"]
         basefile, ext = os.path.splitext(name)
         canon_name = os.path.join("cache", basefile + "-canon.mp3")
         clean_name = os.path.join("cache", basefile + "-clean.mp3")
@@ -60,9 +64,8 @@ def combine(group, sync_offsets, mute_tracks,
         if sample is None:
             log("empty sample")
             continue
-        basename = os.path.basename(group.name_list[i])
-        if basename in hints and "gain" in hints[basename]:
-            track_gain = hints[basename]["gain"]
+        if name in hints and "gain" in hints[name]:
+            track_gain = hints[name]["gain"]
         else:
             track_gain = 1.0
         if group.rms_list[i] > 0:
@@ -73,11 +76,7 @@ def combine(group, sync_offsets, mute_tracks,
         log("RMS: %.0f gain: %.3f" % (group.rms_list[i], rms_mean/group.rms_list[i]) )
         
         mixed_count += total_gain
-        if sync_offsets is None:
-            sync_offset = 0
-        else:
-            sync_offset = sync_offsets[i]
-        log(" ", group.name_list[i], "offset(sec): %.3f" % (sync_offset/1000),
+        log(" ", group.name_list[i], "offset(sec): %.3f" % offset,
             "user gain: %.1f" % track_gain, "total gain: %.2f" % total_gain)
         sample = sample.set_channels(2)
         if pan_range > 0.00001 and pan_range <= 1.0:
@@ -86,26 +85,23 @@ def combine(group, sync_offsets, mute_tracks,
         if not group.suppress_list is None:
             commands = group.suppress_list[i]
         # add hints (offset relative to track 0) to suppress list
-        if basename in hints and "suppress" in hints[basename]:
-            offset_sec = sync_offset/1000
-            print(hints[basename]["suppress"])
-            for cmd in hints[basename]["suppress"]:
+        if name in hints and "suppress" in hints[name]:
+            print(hints[name]["suppress"])
+            for cmd in hints[name]["suppress"]:
                 print(cmd)
-                commands.append( (cmd[0]+offset_sec, cmd[1]+offset_sec) )
+                commands.append( (cmd[0]-offset, cmd[1]-offset) )
         sample = sample.fade_in(1000)
         if suppress_silent_zones and len(commands):
-            # temporarily skip non-music suppression
-            print("commands:", commands)
+            #print("commands:", commands)
             blend = 300         # ms
             seg = None
-            start = 0
             new_sample = sample
             for cmd in commands:
-                #print("command:", cmd)
+                print("command:", cmd)
                 (t0, t1) = cmd
                 ms0 = int(round(t0*1000))
                 ms1 = int(round(t1*1000))
-                #print("  start:", start, "range:", ms0, ms1)
+                #print("new_sample:", len(new_sample), "range:", ms0, ms1)
                 if ms1 - ms0 < 8*blend + 1:
                     # too short to deal with
                     #print("  too short, skipping")
@@ -114,6 +110,7 @@ def combine(group, sync_offsets, mute_tracks,
                 #print("silent:", ms0, ms1)
                 silent = AudioSegment.silent(duration=ms1-ms0)
                 end = new_sample[ms1-blend:]
+                #print("end:", len(end))
                 new_sample = begin.append(silent, crossfade=blend)
                 new_sample = new_sample.append(end, crossfade=blend)
             # new_sample.export("debug1-tmp.mp3", format="mp3",
@@ -128,11 +125,11 @@ def combine(group, sync_offsets, mute_tracks,
                 # sample = sample.normalize()
                 # don't do this because we are using rms to do scaling now
         sr = sample.frame_rate
-        sync_ms = sync_offset
-        if sync_ms >= 0:
-            synced_sample = sample[sync_ms:]
+        sync_ms = int(round(offset * 1000))
+        if sync_ms < 0:
+            synced_sample = sample[-sync_ms:]
         else:
-            pad = AudioSegment.silent(duration=-sync_ms)
+            pad = AudioSegment.silent(duration=sync_ms)
             synced_sample = pad + sample
         # trim end for length
         synced_sample = synced_sample[:duration_ms]
@@ -156,6 +153,7 @@ def combine(group, sync_offsets, mute_tracks,
                 y = np.concatenate([y, np.zeros(diff)], axis=None)
             y_mixed += (y * total_gain)
     if mixed_count < 0.01:
+        log("mixed_count (total weight):", mixed_count)
         log("No unmuted audio tracks found.")
         return AudioSegment.silent(1000)
     print("total max:", np.max(y_mixed))

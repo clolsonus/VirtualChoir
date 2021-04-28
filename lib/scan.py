@@ -3,10 +3,10 @@ import os
 from .logger import log
 
 # find all the project clips (todo: recurse)
-audio_extensions = [ "aac", "aif", "aiff", "m4a", "mp3", "ogg", "wav" ]
+audio_extensions = [ "aac", "aif", "aiff", "flac", "m4a", "mp3", "ogg", "wav" ]
 video_extensions = [ "avi", "m4v", "mov", "mp4", "mpeg", "qt", "webm" ]
-audacity_extension = "aup"
-ignore_extensions = [ "au", "lof", "txt", "zip" ]
+sync_extension = "json"
+ignore_extensions = [ "au", "aup3", "lof", "txt", "zip" ]
 ignore_files = [ "full-mix", "gridded_video", "mixed_audio", "silent_video" ]
 
 # scan a directory for the things (does recurse)
@@ -34,7 +34,7 @@ def recurse_directory(path, pretty_path=""):
                 audio_tracks.append(pretty_name)
                 if ext[1:].lower() in video_extensions:
                     video_tracks.append(pretty_name)
-            elif ext[1:].lower() == audacity_extension:
+            elif ext[1:].lower() == sync_extension:
                 # audacity project file
                 pass
             else:
@@ -45,7 +45,7 @@ def recurse_directory(path, pretty_path=""):
 def scan_directory(path):
     audio_tracks = []
     video_tracks = []
-    aup_project = None
+    sync_file = None
     for file in sorted(os.listdir(path)):
         fullname = os.path.join(path, file)
         if os.path.isdir(fullname):
@@ -61,12 +61,12 @@ def scan_directory(path):
                 audio_tracks.append(file)
                 if ext[1:].lower() in video_extensions:
                     video_tracks.append(file)
-            elif ext[1:].lower() == audacity_extension:
-                if aup_project == None:
-                    aup_project = file
+            elif ext[1:].lower() == sync_extension:
+                if sync_file == None:
+                    sync_file = file
             else:
                 print("Unknown extenstion (skipping):", file)
-    return audio_tracks, video_tracks, aup_project
+    return audio_tracks, video_tracks, sync_file
 
 # scan for nested work directories
 def work_directories(path, order="bottom_up", pretty_path=""):

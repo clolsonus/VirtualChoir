@@ -11,7 +11,7 @@ from subprocess import call
 from tqdm import tqdm
 
 from lib import analyze
-from lib import aup
+from lib import sync
 from lib import hints
 from lib import logger
 from lib.logger import log
@@ -55,9 +55,6 @@ if credits_page:
     log("credits page:", credits_page)
 log("audio tracks:", all_audio_tracks)
 log("video tracks:", all_video_tracks)
-
-#if aup_project:
-#    print("audacity project for sync:", aup_project)
 
 # load and accumulate hints for all dirs
 hint_dict = {}
@@ -111,10 +108,10 @@ for dir in work_dirs:
     audio_group.compute_rms()
     audio_group.clean_noise(clean=clean)
 
-    print("aup:", audio_group.aup_file)
+    print("sync:", audio_group.sync_file)
     
     sync_offsets = []
-    if not audio_group.aup_file:
+    if not audio_group.sync_file:
         # let's figure out the autosync, fingers crossed!!!
         log("Starting automatic track alignment process...", fancy=True)
 
@@ -141,15 +138,18 @@ for dir in work_dirs:
         with open(os.path.join(dir, os.path.basename(dir) + "_audacity_import.lof"), 'w') as fp:
             for i in range(len(audio_group.offset_list)):
                 fp.write('file "%s" offset %.3f\n' % (audio_group.name_list[i], audio_group.offset_list[i]))
+        sync_offsets = {}
         for i in range(len(audio_group.offset_list)):
-            sync_offsets.append( -audio_group.offset_list[i] * 1000) # ms units
+            name = os.path.basename( audio_group.name_list[i] )
+            offset = audio_group.offset_list[i]
+            sync_offsets[name] = { "offset": offset }
     else:
         # we found an audacity project, let's read the sync offsets from that
-        log("Found an audacity project file, using that for time syncs:",
-            audio_group.aup_file, fancy=True)
-        sync_offsets = aup.offsets_from_aup(audio_group.name_list,
-                                            audio_group.sample_list,
-                                            dir, audio_group.aup_file)
+        log("Found an sync file, using that for time syncs:",
+            audio_group.sync_file, fancy=True)
+        sync_offsets = sync.parse_json(os.path.join(dir, audio_group.sync_file),
+                                       0.0, "",
+                                       audio_group.name_list)
 
     if False:
         audio_group.gen_plots(sync_offsets=None)
@@ -162,7 +162,7 @@ for dir in work_dirs:
     else:
         mute_tracks = []
     mixed = mixer.combine(audio_group, sync_offsets,
-                          mute_tracks, hints=hint_dict, pan_range=0.2,
+                          mute_tracks, hints=hint_dict, pan_range=0.1,
                           suppress_silent_zones=suppress_silent_zones)
     log("Mixed audio file:", group_file)
     
@@ -196,7 +196,7 @@ for dir in work_dirs:
                            audio_group.sample_list, mute_tracks)
 
 if len(all_video_tracks) and not args.no_video:
-    offsets = aup.build_offset_map(args.project)
+    offsets = sync.build_offset_map(args.project)
     
     log("Generating gridded video", fancy=True)
     video_offsets = []
@@ -206,7 +206,7 @@ if len(all_video_tracks) and not args.no_video:
             # from .lof file
             offset = offsets[track]["offset"]
         elif trackbase in offsets:
-            # aup doesn't save ext
+            # audactiy info macro doesn't include ext
             offset = offsets[trackbase]["offset"]
         else:
             log("No offset found for:", track)
