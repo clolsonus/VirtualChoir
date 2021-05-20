@@ -38,8 +38,10 @@ def load(path):
                         hints[name]["suppress"].append( (float(row[2]), float(row[3])) )
                     else:
                         hints[name]["suppress"] = [ (float(row[2]), float(row[3])) ]
+                elif hint == "no_suppress":
+                    hints[name][hint] = True
                 else:
-                    log("unknwon hint in hint.txt:", row)
+                    log("unknown hint in hint.txt:", row)
     return hints
 
 def validate( hints, audio_tracks, video_tracks ):
