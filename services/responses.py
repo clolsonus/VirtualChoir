@@ -31,6 +31,8 @@ def process( settings ):
         reader = csv.DictReader(f)
         for row in reader:
             print("row:", row)
+            if "Timestamp" not in row:
+                continue
             timestamp = row['Timestamp']
             dt = datetime.strptime(timestamp, '%m/%d/%Y %H:%M:%S')
             ts = time.mktime(dt.timetuple())
