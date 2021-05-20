@@ -128,7 +128,7 @@ def render_combined_video(project, resolution, results_dir,
                 v.face.update_interp()
             # hack to use faces data to fix duration on webm videos
             # that don't self report
-            if v.duration <= 1 and not faces is None and basename in faces:
+            if v.duration <= 1 and not faces is None and basename in faces and len(v.face.data):
                 v.duration = v.face.data[-1]["time"]
                 v.total_frames = int(round(v.duration * v.fps))
                 print("Updated video duration:", v.duration)
