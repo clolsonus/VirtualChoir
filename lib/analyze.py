@@ -91,7 +91,7 @@ class SampleGroup():
         raws = []
         for ch in channels:
             raws.append( ch.get_array_of_samples() )
-        sos = signal.butter(4, [120, 4500], 'bp', fs=sample.frame_rate, output='sos')
+        sos = signal.butter(4, [80, 4500], 'bp', fs=sample.frame_rate, output='sos')
         filtered = []
         for raw in raws:
             filt = signal.sosfilt(sos, raw).astype(float)
@@ -262,17 +262,20 @@ class SampleGroup():
         # where clarity > threshold
         log("Estimating rms for active regions:")
         self.rms_list = []
-        for i in range(len(self.clarity_list)):
-            clarity = self.clarity_list[i]
+        for i in range(len(self.intensity_list)):
             intensity = self.intensity_list[i]
             # 3print("track:", i, len(clarity), len(intensity))
-            mean = np.mean(clarity)
-            std = np.std(clarity)
-            threshold = std * 0.1
+            mean = np.mean(intensity)
+            std = np.std(intensity)
+            num = len(intensity)
+            five_perc = np.sort(intensity)[int(round(num*0.05))]
+            print("5%", five_perc)
+            #threshold = std * 0.1
+            threshold = 4 * five_perc
             sum = 0
             count = 0
-            for j in range(len(clarity)):
-                if clarity[j] >= threshold:
+            for j in range(len(intensity)):
+                if intensity[j] >= threshold:
                     sum += intensity[j]*intensity[j]
                     count += 1
             if count > 0:
@@ -281,26 +284,40 @@ class SampleGroup():
                 self.rms_list.append( 0 )
         log("rms:", self.rms_list)
         
-    def compute_envelopes(self):
+    def compute_envelopes(self, hints={}):
         self.envelope_list = []
         self.suppress_list = []
         
         # presumes clarities have been computed
         dt = self.time_list[0][1] - self.time_list[0][0]
-        for i in range(len(self.clarity_list)):
-            clarity = self.clarity_list[i]
+        for i in range(len(self.intensity_list)):
+            name = os.path.basename(self.name_list[i])
+            intensity = self.intensity_list[i]
             times = self.time_list[i]
             env = []
             commands = []
-            print("track:", i, len(clarity), len(times))
-            mean = np.mean(clarity)
-            std = np.std(clarity)
-            threshold = std * 0.1
+            print("track:", i, len(intensity), len(times))
+            mean = np.mean(intensity)
+            std = np.std(intensity)
+            min = np.min(intensity)
+            max = np.max(intensity)
+            print("mean:", mean, "std:", std, "min:", min)
+            #print(np.sort(intensity).tolist())
+            num = len(intensity)
+            five_perc = np.sort(intensity)[int(round(num*0.05))]
+            print("5%", five_perc)
+            #plt.figure()
+            #plt.plot(np.sort(intensity))
+            #plt.show()
+        
+            #threshold = std * 0.1
+            lower_threshold = five_perc
+            upper_threshold = 2 * five_perc
             start = 0
             end = 0
             active = None
-            for j in range(len(clarity)):
-                if clarity[j] < threshold:
+            for j in range(len(intensity)):
+                if intensity[j] < lower_threshold:
                     if active is None:
                         # starting inactive
                         env.append( [times[j], 0] )
@@ -310,7 +327,7 @@ class SampleGroup():
                         env.append( [times[j], 1] )
                         start = j
                     active = False
-                else:
+                elif intensity[j] > upper_threshold:
                     if active is None:
                         # starting active
                         env.append( [times[j], 1] )
@@ -342,7 +359,11 @@ class SampleGroup():
             #print(env)
             self.envelope_list.append(env)
             #print(commands)
-            self.suppress_list.append(commands)
+            if name in hints and "no_suppress" in hints[name]:
+                log("no suppress in hints:", name)
+                self.suppress_list.append([])
+            else:
+                self.suppress_list.append(commands)
             
     def compute_margins(self):
         # presumes onset envelopes and clarities have been computed
@@ -422,34 +443,37 @@ class SampleGroup():
         offset_matrix = np.zeros( (num, num) )
         for i in range(0, num):
             for j in range(i, num):
-                print(i, j, metric_list[i].shape, metric_list[j].shape)
-                ycorr = np.correlate(metric_list[i],
-                                     metric_list[j],
-                                     mode='full')
-                max_index = np.argmax(ycorr)
-                print("max index:", max_index)
-                if max_index > len(metric_list[j]):
-                    shift = max_index - len(metric_list[j])
-                    shift_time = self.time_list[i][shift]
-                    plot1 = metric_list[i]
-                    plot2 = np.concatenate([np.zeros(shift),
-                                            metric_list[j]])
-                    print(i, j, self.time_list[i][shift])
-                elif max_index < len(metric_list[j]):
-                    shift = len(metric_list[j]) - 1 - max_index
-                    shift_time = -self.time_list[j][shift]
-                    plot1 = np.concatenate([np.zeros(shift),
-                                            metric_list[i]], axis=None)
-                    plot2 = metric_list[j]
-                    print(i, -self.time_list[j][shift])
+                if i == j:
+                    offset_matrix[i, j] = 0
                 else:
-                    plot1 = metric_list[i]
-                    plot2 = metric_list[j]
-                    shift = 0
-                    shift_time = 0
-                    print(i, 0)
-                offset_matrix[i, j] = shift_time
-                offset_matrix[j, i] = -shift_time
+                    print(i, j, metric_list[i].shape, metric_list[j].shape)
+                    ycorr = np.correlate(metric_list[i],
+                                         metric_list[j],
+                                         mode='full')
+                    max_index = np.argmax(ycorr)
+                    print("max index:", max_index)
+                    if max_index > len(metric_list[j]):
+                        shift = max_index - len(metric_list[j])
+                        shift_time = self.time_list[i][shift]
+                        plot1 = metric_list[i]
+                        plot2 = np.concatenate([np.zeros(shift),
+                                                metric_list[j]])
+                        print(i, j, self.time_list[i][shift])
+                    elif max_index < len(metric_list[j]):
+                        shift = len(metric_list[j]) - 1 - max_index
+                        shift_time = -self.time_list[j][shift]
+                        plot1 = np.concatenate([np.zeros(shift),
+                                                metric_list[i]], axis=None)
+                        plot2 = metric_list[j]
+                        print(i, -self.time_list[j][shift])
+                    else:
+                        plot1 = metric_list[i]
+                        plot2 = metric_list[j]
+                        shift = 0
+                        shift_time = 0
+                        print(i, 0)
+                    offset_matrix[i, j] = shift_time
+                    offset_matrix[j, i] = -shift_time
                 if plot:
                     plt.figure()
                     plt.plot(ycorr)
@@ -595,7 +619,7 @@ class SampleGroup():
                                       basename + "-clean.mp3")
             log("Generating noise profile for:", name)
             if not self.is_newer(noise_name, canon_name):
-                new_sample = None
+                new_sample = AudioSegment.empty()
                 commands = self.suppress_list[i]
                 if len(commands):
                     #print("commands:", commands)
@@ -603,22 +627,28 @@ class SampleGroup():
                     seg = None
                     start = 0
                     for cmd in commands:
-                        #print("command:", cmd)
+                        print("command:", cmd)
                         (t0, t1) = cmd
                         ms0 = int(round(t0*1000))
                         ms1 = int(round(t1*1000))
-                        #print("  start:", start, "range:", ms0, ms1)
+                        print("  start:", start, "range:", ms0, ms1)
                         if (ms1 - ms0) < 2*blend:
                             # too short to deal with
                             continue
-                        #print("noise:", ms0, ms1)
+                        print("noise:", ms0, ms1)
                         noise = sample[ms0:ms1]
-                        if new_sample is None:
-                            new_sample = noise
-                        else:
-                            new_sample.append(noise, crossfade=blend)
-                if not new_sample is None:
+                        new_sample += noise
+                        # if new_sample is None:
+                        #     print("first sample:", len(noise))
+                        #     new_sample = noise
+                        # else:
+                        #     print("append sample:", len(noise), len(new_sample))
+                        #     new_sample.append(noise, crossfade=blend)
+                else:
+                    log("  no suppression commands for:", name)
+                if len(new_sample) > 0:
                     # generate noise sample
+                    print("export noise sample:", len(new_sample))
                     new_sample.export(noise_name, format="mp3")
             if os.path.exists(noise_name):
                 if not self.is_newer(noiseprof_name, noise_name):
