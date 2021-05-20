@@ -25,7 +25,7 @@ parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
                     help='sync strategy')
 parser.add_argument('--reference', help='file name of declared refrence track')
 parser.add_argument('--suppress-noise', action='store_true', help='try to suppress extraneous noises.')
-parser.add_argument('--reverb', default='light', choices=['light', 'medium', 'heavy'],
+parser.add_argument('--reverb', default='light', choices=['none', 'light', 'medium', 'heavy'],
                     help='how much reverb in the final mix?')
 parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
 parser.add_argument('--mute-videos', action='store_true', help='mute all video tracks (some projects do all lip sync videos.')
@@ -104,7 +104,7 @@ for dir in work_dirs:
     audio_group.compute_onset()
     audio_group.compute_intensities()
     audio_group.compute_clarities()
-    audio_group.compute_envelopes()
+    audio_group.compute_envelopes(hints=hint_dict)
     audio_group.compute_rms()
     audio_group.clean_noise(clean=clean)
 
@@ -167,22 +167,37 @@ for dir in work_dirs:
     log("Mixed audio file:", group_file)
     
     if dir == work_dirs[-1]:
+        y = np.array(mixed.get_array_of_samples()).astype('double')
+        print("before compress max:", np.max(np.abs(y)))
+        if False:
+            log("Applying compression...")
+            mixed = mixed.compress_dynamic_range()
+            y = np.array(mixed.get_array_of_samples()).astype('double')
+            print("after compress max:", np.max(np.abs(y)))
+        mixed = mixed.normalize()
+        y = np.array(mixed.get_array_of_samples()).astype('double')
+        print("after normalize:", np.max(np.abs(y)))
+        
         # top level final mix, write a temp file, then add reverb with sox
+        reverb = 0
         if args.reverb == "light":
-            reverb = 50
+            reverb = 25
         elif args.reverb == "medium":
-            reverb = 60
+            reverb = 50
         elif args.reverb == "heavy":
             reverb = 75
         mixed.export(group_file + "-tmp.mp3", format="mp3",
                      tags={'artist': 'Various', 'album': 'Virtual Choir Maker',
                            'comments': 'https://virtualchoir.flightgear.org'})
-        command = [ "sox", group_file + "-tmp.mp3", group_file,
-                    "reverb", "%d" % reverb, "50", "75" ]
-        log("command:", command)
-        result = call(command)
-        log("sox result code:", result)
-        os.unlink(group_file + "-tmp.mp3")
+        if reverb > 0:
+            command = [ "sox", group_file + "-tmp.mp3", group_file,
+                        "reverb", "%d" % reverb, "50", "75" ]
+            log("command:", command)
+            result = call(command)
+            log("sox result code:", result)
+            os.unlink(group_file + "-tmp.mp3")
+        else:
+            os.rename(group_file + "-tmp.mp3", group_file)
     else:
         # sub group mix
         mixed.export(group_file, format="mp3",
