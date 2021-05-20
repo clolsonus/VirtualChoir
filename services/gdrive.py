@@ -192,6 +192,7 @@ class gdrive():
                 # fetch file
                 print("%s (%s) %.0f Kb" % (item["name"], item["mimeType"], int(item["size"]) / 1024 ))
                 name = self.fix_extension(item['name'], item['mimeType'])
+                name = name.replace("/", "-")
                 dest_file = os.path.join(work_dir, name)
                 if os.path.exists(dest_file):
                     statinfo = os.stat(dest_file)
