@@ -137,7 +137,7 @@ def combine(group, sync_offsets, mute_tracks,
         group.sample_list[i] = synced_sample
 
         y = np.array(synced_sample.get_array_of_samples()).astype('double')
-        print(i, "max:", np.max(y))
+        print(i, "max:", np.max(np.abs(y)))
         #print(" ", y.shape)
         if y_mixed is None:
             y_mixed = y * total_gain
@@ -158,7 +158,8 @@ def combine(group, sync_offsets, mute_tracks,
         return AudioSegment.silent(1000)
     print("total max:", np.max(y_mixed))
     print("total min:", np.min(y_mixed))
-    min_div = np.max(np.abs(y_mixed)) / 30000 # leave headroom for reverb
+    min_div = np.max(np.abs(y_mixed)) / 31000 # leave headroom for reverb
+    print("min_div:", min_div, "sqrt(%.2f):" % mixed_count, math.sqrt(mixed_count))
     if math.sqrt(mixed_count) > min_div:
         # balsy but good chance of working
         y_mixed /= math.sqrt(mixed_count)
@@ -169,7 +170,7 @@ def combine(group, sync_offsets, mute_tracks,
     print("mixed max:", np.max(np.abs(y_mixed)))
     y_mixed = np.int16(y_mixed)
     mixed = AudioSegment(y_mixed.tobytes(), frame_rate=sr, sample_width=2, channels=sample.channels)
-    mixed.normalize()
+    #mixed = mixed.normalize()
     return mixed
 
 def clear_aligned(results_dir):
