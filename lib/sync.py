@@ -23,7 +23,7 @@ def parse_lof(lof_file, dir_offset, pretty_path):
                 "length": None
             }
     print("offsets:", offsets)
-    return(offsets)
+    return offsets
 
 def parse_json(json_file, dir_offset, pretty_path, audio_tracks=None):
     print("parse json:", json_file)
@@ -56,8 +56,8 @@ def parse_json(json_file, dir_offset, pretty_path, audio_tracks=None):
                 log("bad json sync file syntax:", json_file)
                 log("entry:", row)
                 quit()
-    print("offsets:", offsets)
-    return(offsets)
+    print("json offsets:", offsets)
+    return offsets
 
 def build_offset_map(path):
     offsets = {}
@@ -84,6 +84,7 @@ def build_offset_map(path):
         lof_file = scan.find_extension(dir, "lof")
         if sync_file:
             result = parse_json(sync_file, dir_offset, pretty_path)
+            offsets.update( result )
         elif lof_file:
             result = parse_lof( lof_file, dir_offset, pretty_path )
             offsets.update( result )
