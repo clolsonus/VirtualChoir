@@ -143,6 +143,8 @@ def run_job(settings, request):
         for o in options:
             if o.lower().startswith("suppress noise"):
                 command.append("--suppress-noise")
+            elif o.lower().startswith("dynamic range compression"):
+                command.append("--compression")
             elif o.lower().startswith("make individual time aligned tracks"):
                 aligned_tracks = True
                 command.append("--write-aligned-tracks")
