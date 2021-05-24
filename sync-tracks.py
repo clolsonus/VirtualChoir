@@ -25,6 +25,7 @@ parser.add_argument('--sync', default='clarity', choices=['clarity', 'clap'],
                     help='sync strategy')
 parser.add_argument('--reference', help='file name of declared refrence track')
 parser.add_argument('--suppress-noise', action='store_true', help='try to suppress extraneous noises.')
+parser.add_argument('--compression', action='store_true', help='dynamic range compression on final audio mix.')
 parser.add_argument('--reverb', default='light', choices=['none', 'light', 'medium', 'heavy'],
                     help='how much reverb in the final mix?')
 parser.add_argument('--write-aligned-tracks', action='store_true', help='write out padded/clipped individual tracks aligned from start.')
@@ -168,9 +169,9 @@ for dir in work_dirs:
     
     if dir == work_dirs[-1]:
         y = np.array(mixed.get_array_of_samples()).astype('double')
-        print("before compress max:", np.max(np.abs(y)))
-        if False:
-            log("Applying compression...")
+        if args.compress:
+            print("before compress max:", np.max(np.abs(y)))
+            log("Applying compression (may take some time) ...")
             mixed = mixed.compress_dynamic_range()
             y = np.array(mixed.get_array_of_samples()).astype('double')
             print("after compress max:", np.max(np.abs(y)))
