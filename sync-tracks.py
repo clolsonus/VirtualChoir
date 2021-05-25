@@ -169,7 +169,7 @@ for dir in work_dirs:
     
     if dir == work_dirs[-1]:
         y = np.array(mixed.get_array_of_samples()).astype('double')
-        if args.compress:
+        if args.compression:
             print("before compress max:", np.max(np.abs(y)))
             log("Applying compression (may take some time) ...")
             mixed = mixed.compress_dynamic_range()
