@@ -179,3 +179,27 @@ all worth while!
 ## Sample recording instructions:
 
    https://docs.google.com/document/d/1mWFmZ76PZErq-XEIeCNmw1FZdtWXVHjOARTSdNITCzA/edit?usp=sharing
+
+
+# BETA Testers Unite
+
+Would you like to run the software directly on your own PC (or maybe
+Mac?)  Here are the slightly geeky/technical instructions.  If you
+find any mistakes or ommissions, please send me corrections and
+improvements.
+
+* Install anaconda3 (a python distribution)
+* Download this repository as a zip file and extract it somewhere on
+  your desktop computer where you can find it.
+* Start an anaconda shell and cd to the folder where you extracted the
+  virtualchoir application.  You should see a file called "environment.yml"
+* Run: "conda env create -f environment.yml"
+* Run: "conda activate virtualchoir"
+* Run: "python sync-tracks.py \path\to\your\folder\of\tracks"
+
+
+# NOTES to self. (Ignore the guy behind the curtain!)
+
+> conda create --name virtualchoir python pip opencv scipy matplotlib ffmpeg tqdm git
+> conda install -c conda-forge dlib
+> pip install librosa pydub sk-video
